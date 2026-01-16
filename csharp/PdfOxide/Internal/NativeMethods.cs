@@ -534,6 +534,32 @@ namespace PdfOxide.Internal
             out uint height,
             out int errorCode);
 
+        /// <summary>
+        /// Gets the size of the raw image data.
+        /// </summary>
+        /// <param name="handle">The element handle.</param>
+        /// <param name="errorCode">Output parameter for error code.</param>
+        /// <returns>The size in bytes of the image data, or -1 on error.</returns>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention)]
+        public static extern int PdfImageElementGetDataSize(
+            IntPtr handle,
+            out int errorCode);
+
+        /// <summary>
+        /// Gets the raw image data from an image element.
+        /// </summary>
+        /// <param name="handle">The element handle.</param>
+        /// <param name="data">Output buffer for image data.</param>
+        /// <param name="maxLen">Maximum length of data buffer.</param>
+        /// <param name="errorCode">Output parameter for error code.</param>
+        /// <returns>The number of bytes written to data buffer, or -1 on error.</returns>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention)]
+        public static extern int PdfImageElementGetData(
+            IntPtr handle,
+            byte[] data,
+            int maxLen,
+            out int errorCode);
+
         #endregion
 
         #region Annotation API

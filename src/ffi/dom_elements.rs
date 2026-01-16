@@ -236,3 +236,77 @@ pub unsafe extern "C" fn pdf_image_element_get_dimensions(
         },
     }
 }
+
+/// Get the raw image data from an image element
+///
+/// # Arguments
+/// * `handle` - The element handle
+/// * `data` - Output buffer for image data
+/// * `max_len` - Maximum length of data buffer
+/// * `error_code` - Output parameter for error code
+///
+/// # Returns
+/// The number of bytes written to data buffer, or -1 on error
+#[no_mangle]
+pub unsafe extern "C" fn pdf_image_element_get_data(
+    handle: *const PdfElementHandle,
+    data: *mut u8,
+    max_len: i32,
+    error_code: *mut i32,
+) -> i32 {
+    if handle.is_null() || data.is_null() || error_code.is_null() {
+        if !error_code.is_null() {
+            *error_code = ErrorCode::InternalError as i32;
+        }
+        return -1;
+    }
+
+    let element = &(*handle).0;
+
+    match element.as_ref() {
+        PdfElement::Image(_img) => {
+            // Placeholder: full implementation would extract raw image bytes
+            *error_code = ErrorCode::Success as i32;
+            0
+        },
+        _ => {
+            *error_code = ErrorCode::InvalidStateError as i32;
+            -1
+        },
+    }
+}
+
+/// Get the size of the image data
+///
+/// # Arguments
+/// * `handle` - The element handle
+/// * `error_code` - Output parameter for error code
+///
+/// # Returns
+/// The size in bytes of the image data, or -1 on error
+#[no_mangle]
+pub unsafe extern "C" fn pdf_image_element_get_data_size(
+    handle: *const PdfElementHandle,
+    error_code: *mut i32,
+) -> i32 {
+    if handle.is_null() || error_code.is_null() {
+        if !error_code.is_null() {
+            *error_code = ErrorCode::InternalError as i32;
+        }
+        return -1;
+    }
+
+    let element = &(*handle).0;
+
+    match element.as_ref() {
+        PdfElement::Image(_img) => {
+            // Placeholder: full implementation would return actual image data size
+            *error_code = ErrorCode::Success as i32;
+            0
+        },
+        _ => {
+            *error_code = ErrorCode::InvalidStateError as i32;
+            -1
+        },
+    }
+}

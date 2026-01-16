@@ -111,7 +111,39 @@ namespace PdfOxide.Core.Elements
         /// Gets the image data as a byte array.
         /// </summary>
         /// <value>The raw image bytes.</value>
-        public byte[] ImageData => Array.Empty<byte>(); // Placeholder
+        /// <exception cref="ObjectDisposedException">Thrown if the element has been disposed.</exception>
+        public byte[] ImageData
+        {
+            get
+            {
+                ThrowIfDisposed();
+
+                // Get the size of the image data
+                var size = NativeMethods.PdfImageElementGetDataSize(_handle.DangerousGetHandle(),
+                    out var errorCode);
+                ExceptionMapper.ThrowIfError(errorCode);
+
+                if (size <= 0)
+                    return Array.Empty<byte>();
+
+                // Extract the image data
+                var data = new byte[size];
+                var bytesRead = NativeMethods.PdfImageElementGetData(_handle.DangerousGetHandle(),
+                    data, size, out errorCode);
+                ExceptionMapper.ThrowIfError(errorCode);
+
+                if (bytesRead < 0 || bytesRead > size)
+                    return Array.Empty<byte>();
+
+                // If fewer bytes were read than expected, resize the array
+                if (bytesRead < size)
+                {
+                    System.Array.Resize(ref data, bytesRead);
+                }
+
+                return data;
+            }
+        }
 
         /// <summary>
         /// Gets the alternative text for the image.

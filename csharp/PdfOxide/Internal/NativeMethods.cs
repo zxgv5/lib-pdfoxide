@@ -441,6 +441,308 @@ namespace PdfOxide.Internal
 
         #endregion
 
+        #region Element API
+
+        /// <summary>
+        /// Gets the number of elements of a specific type on a page.
+        /// </summary>
+        /// <param name="handle">The page handle.</param>
+        /// <param name="elementType">The type of element to count (ELEMENT_TYPE_*).</param>
+        /// <param name="errorCode">Output parameter for error code.</param>
+        /// <returns>The number of elements found, or -1 on error.</returns>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention)]
+        public static extern int PdfPageFindElementsCount(
+            IntPtr handle,
+            int elementType,
+            out int errorCode);
+
+        /// <summary>
+        /// Gets the text content of a text element.
+        /// </summary>
+        /// <param name="handle">The element handle.</param>
+        /// <param name="errorCode">Output parameter for error code.</param>
+        /// <returns>UTF-8 null-terminated string pointer. Must be freed with FreeString().</returns>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention)]
+        public static extern IntPtr PdfTextElementGetContent(
+            IntPtr handle,
+            out int errorCode);
+
+        /// <summary>
+        /// Gets the font size of a text element.
+        /// </summary>
+        /// <param name="handle">The element handle.</param>
+        /// <param name="errorCode">Output parameter for error code.</param>
+        /// <returns>The font size in points.</returns>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention)]
+        public static extern float PdfTextElementGetFontSize(
+            IntPtr handle,
+            out int errorCode);
+
+        /// <summary>
+        /// Gets the bounding box of an element.
+        /// </summary>
+        /// <param name="handle">The element handle.</param>
+        /// <param name="x">Output parameter for x coordinate.</param>
+        /// <param name="y">Output parameter for y coordinate.</param>
+        /// <param name="width">Output parameter for width.</param>
+        /// <param name="height">Output parameter for height.</param>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention)]
+        public static extern void PdfElementGetBbox(
+            IntPtr handle,
+            out float x,
+            out float y,
+            out float width,
+            out float height);
+
+        /// <summary>
+        /// Gets the element type as an integer constant.
+        /// </summary>
+        /// <param name="handle">The element handle.</param>
+        /// <returns>The element type constant (ELEMENT_TYPE_*), or -1 if invalid.</returns>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention)]
+        public static extern int PdfElementGetType(IntPtr handle);
+
+        /// <summary>
+        /// Frees an element handle.
+        /// </summary>
+        /// <param name="handle">The element handle to free.</param>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention)]
+        public static extern void PdfElementFree(IntPtr handle);
+
+        /// <summary>
+        /// Gets the format of an image element.
+        /// </summary>
+        /// <param name="handle">The element handle.</param>
+        /// <param name="errorCode">Output parameter for error code.</param>
+        /// <returns>The image format constant (0=JPEG, 1=PNG, 2=TIFF, 3=Unknown).</returns>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention)]
+        public static extern int PdfImageElementGetFormat(
+            IntPtr handle,
+            out int errorCode);
+
+        /// <summary>
+        /// Gets the dimensions of an image element.
+        /// </summary>
+        /// <param name="handle">The element handle.</param>
+        /// <param name="width">Output parameter for width in pixels.</param>
+        /// <param name="height">Output parameter for height in pixels.</param>
+        /// <param name="errorCode">Output parameter for error code.</param>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention)]
+        public static extern void PdfImageElementGetDimensions(
+            IntPtr handle,
+            out uint width,
+            out uint height,
+            out int errorCode);
+
+        #endregion
+
+        #region Annotation API
+
+        /// <summary>
+        /// Gets the number of annotations on a page.
+        /// </summary>
+        /// <param name="handle">The page handle.</param>
+        /// <param name="errorCode">Output parameter for error code.</param>
+        /// <returns>The number of annotations found, or -1 on error.</returns>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention)]
+        public static extern int PdfPageGetAnnotationsCount(
+            IntPtr handle,
+            out int errorCode);
+
+        /// <summary>
+        /// Gets the count of annotations of a specific type on a page.
+        /// </summary>
+        /// <param name="handle">The page handle.</param>
+        /// <param name="annotationType">The type of annotation to count (ANNOTATION_TYPE_*).</param>
+        /// <param name="errorCode">Output parameter for error code.</param>
+        /// <returns>The number of annotations of that type, or -1 on error.</returns>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention)]
+        public static extern int PdfPageGetAnnotationsByTypeCount(
+            IntPtr handle,
+            int annotationType,
+            out int errorCode);
+
+        /// <summary>
+        /// Gets the type of an annotation.
+        /// </summary>
+        /// <param name="handle">The annotation handle.</param>
+        /// <returns>The annotation type constant (ANNOTATION_TYPE_*), or -1 if invalid.</returns>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention)]
+        public static extern int PdfAnnotationGetType(IntPtr handle);
+
+        /// <summary>
+        /// Gets the contents/text of an annotation.
+        /// </summary>
+        /// <param name="handle">The annotation handle.</param>
+        /// <param name="errorCode">Output parameter for error code.</param>
+        /// <returns>UTF-8 null-terminated string pointer. Must be freed with FreeString().</returns>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention)]
+        public static extern IntPtr PdfAnnotationGetContents(
+            IntPtr handle,
+            out int errorCode);
+
+        /// <summary>
+        /// Gets the subject of an annotation.
+        /// </summary>
+        /// <param name="handle">The annotation handle.</param>
+        /// <param name="errorCode">Output parameter for error code.</param>
+        /// <returns>UTF-8 null-terminated string pointer. Must be freed with FreeString().</returns>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention)]
+        public static extern IntPtr PdfAnnotationGetSubject(
+            IntPtr handle,
+            out int errorCode);
+
+        /// <summary>
+        /// Gets the author of an annotation.
+        /// </summary>
+        /// <param name="handle">The annotation handle.</param>
+        /// <param name="errorCode">Output parameter for error code.</param>
+        /// <returns>UTF-8 null-terminated string pointer. Must be freed with FreeString().</returns>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention)]
+        public static extern IntPtr PdfAnnotationGetAuthor(
+            IntPtr handle,
+            out int errorCode);
+
+        /// <summary>
+        /// Gets the bounding box of an annotation.
+        /// </summary>
+        /// <param name="handle">The annotation handle.</param>
+        /// <param name="x">Output parameter for x coordinate.</param>
+        /// <param name="y">Output parameter for y coordinate.</param>
+        /// <param name="width">Output parameter for width.</param>
+        /// <param name="height">Output parameter for height.</param>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention)]
+        public static extern void PdfAnnotationGetBbox(
+            IntPtr handle,
+            out float x,
+            out float y,
+            out float width,
+            out float height);
+
+        /// <summary>
+        /// Gets the color of an annotation as RGB values (0.0-1.0).
+        /// </summary>
+        /// <param name="handle">The annotation handle.</param>
+        /// <param name="r">Output parameter for red component.</param>
+        /// <param name="g">Output parameter for green component.</param>
+        /// <param name="b">Output parameter for blue component.</param>
+        /// <param name="hasColor">Output parameter for whether color was found (1=yes, 0=no).</param>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention)]
+        public static extern void PdfAnnotationGetColor(
+            IntPtr handle,
+            out float r,
+            out float g,
+            out float b,
+            out int hasColor);
+
+        /// <summary>
+        /// Gets the opacity of an annotation (0.0-1.0).
+        /// </summary>
+        /// <param name="handle">The annotation handle.</param>
+        /// <param name="errorCode">Output parameter for error code.</param>
+        /// <returns>The opacity value (1.0 if not set).</returns>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention)]
+        public static extern float PdfAnnotationGetOpacity(
+            IntPtr handle,
+            out int errorCode);
+
+        /// <summary>
+        /// Gets flags for an annotation (visibility, printability, etc.).
+        /// </summary>
+        /// <param name="handle">The annotation handle.</param>
+        /// <param name="errorCode">Output parameter for error code.</param>
+        /// <returns>The flags as a bitmask.</returns>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention)]
+        public static extern int PdfAnnotationGetFlags(
+            IntPtr handle,
+            out int errorCode);
+
+        /// <summary>
+        /// Text annotation specific: Gets the icon type.
+        /// </summary>
+        /// <param name="handle">The annotation handle.</param>
+        /// <param name="errorCode">Output parameter for error code.</param>
+        /// <returns>The icon type code (0=Comment, 1=Key, 2=Note, 3=Help, etc., -1=Unknown).</returns>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention)]
+        public static extern int PdfTextAnnotationGetIcon(
+            IntPtr handle,
+            out int errorCode);
+
+        /// <summary>
+        /// Text annotation specific: Gets whether the annotation is open.
+        /// </summary>
+        /// <param name="handle">The annotation handle.</param>
+        /// <param name="errorCode">Output parameter for error code.</param>
+        /// <returns>1 if open, 0 if closed.</returns>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention)]
+        public static extern int PdfTextAnnotationGetOpen(
+            IntPtr handle,
+            out int errorCode);
+
+        /// <summary>
+        /// Link annotation specific: Gets the URI of a link.
+        /// </summary>
+        /// <param name="handle">The annotation handle.</param>
+        /// <param name="errorCode">Output parameter for error code.</param>
+        /// <returns>UTF-8 null-terminated string pointer. Must be freed with FreeString().</returns>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention)]
+        public static extern IntPtr PdfLinkAnnotationGetUri(
+            IntPtr handle,
+            out int errorCode);
+
+        /// <summary>
+        /// Link annotation specific: Gets the destination page index.
+        /// </summary>
+        /// <param name="handle">The annotation handle.</param>
+        /// <param name="errorCode">Output parameter for error code.</param>
+        /// <returns>The page index, or -1 if not a page link or error.</returns>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention)]
+        public static extern int PdfLinkAnnotationGetPage(
+            IntPtr handle,
+            out int errorCode);
+
+        /// <summary>
+        /// Text markup annotation specific: Gets the markup type.
+        /// </summary>
+        /// <param name="handle">The annotation handle.</param>
+        /// <param name="errorCode">Output parameter for error code.</param>
+        /// <returns>The markup type (0=Highlight, 1=Underline, 2=StrikeOut, 3=Squiggly, -1=Unknown).</returns>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention)]
+        public static extern int PdfTextMarkupAnnotationGetType(
+            IntPtr handle,
+            out int errorCode);
+
+        /// <summary>
+        /// FreeText annotation specific: Gets the font name.
+        /// </summary>
+        /// <param name="handle">The annotation handle.</param>
+        /// <param name="errorCode">Output parameter for error code.</param>
+        /// <returns>UTF-8 null-terminated string pointer. Must be freed with FreeString().</returns>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention)]
+        public static extern IntPtr PdfFreeTextAnnotationGetFontName(
+            IntPtr handle,
+            out int errorCode);
+
+        /// <summary>
+        /// FreeText annotation specific: Gets the font size.
+        /// </summary>
+        /// <param name="handle">The annotation handle.</param>
+        /// <param name="errorCode">Output parameter for error code.</param>
+        /// <returns>The font size in points.</returns>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention)]
+        public static extern float PdfFreeTextAnnotationGetFontSize(
+            IntPtr handle,
+            out int errorCode);
+
+        /// <summary>
+        /// Frees an annotation handle.
+        /// </summary>
+        /// <param name="handle">The annotation handle to free.</param>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention)]
+        public static extern void PdfAnnotationFree(IntPtr handle);
+
+        #endregion
+
         #region Utility Functions
 
         /// <summary>

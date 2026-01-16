@@ -23,6 +23,7 @@ pub mod annotations;
 pub mod conversion;
 pub mod document_editor;
 pub mod dom;
+pub mod dom_elements;
 pub mod exceptions;
 pub mod forms;
 pub mod geometry;

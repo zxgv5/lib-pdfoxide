@@ -6,9 +6,6 @@
 //! - Basic element property access
 
 use crate::editor::dom::PdfPage;
-use std::ptr;
-
-use super::exceptions::ErrorCode;
 
 /// Opaque handle for PdfPage
 pub struct PdfPageHandle(PdfPage);

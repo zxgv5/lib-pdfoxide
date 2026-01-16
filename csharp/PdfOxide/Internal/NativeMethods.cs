@@ -164,7 +164,252 @@ namespace PdfOxide.Internal
 
         #endregion
 
+        #region Pdf Creation API
+
+        /// <summary>
+        /// Creates a PDF from Markdown content.
+        /// </summary>
+        /// <param name="markdown">UTF-8 null-terminated Markdown content.</param>
+        /// <param name="errorCode">Output parameter for error code.</param>
+        /// <returns>Opaque handle to Pdf, or null on error.</returns>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention, CharSet = CharSet.Ansi)]
+        public static extern NativeHandle PdfFromMarkdown(
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string markdown,
+            out int errorCode);
+
+        /// <summary>
+        /// Creates a PDF from HTML content.
+        /// </summary>
+        /// <param name="html">UTF-8 null-terminated HTML content.</param>
+        /// <param name="errorCode">Output parameter for error code.</param>
+        /// <returns>Opaque handle to Pdf, or null on error.</returns>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention, CharSet = CharSet.Ansi)]
+        public static extern NativeHandle PdfFromHtml(
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string html,
+            out int errorCode);
+
+        /// <summary>
+        /// Creates a PDF from plain text content.
+        /// </summary>
+        /// <param name="text">UTF-8 null-terminated text content.</param>
+        /// <param name="errorCode">Output parameter for error code.</param>
+        /// <returns>Opaque handle to Pdf, or null on error.</returns>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention, CharSet = CharSet.Ansi)]
+        public static extern NativeHandle PdfFromText(
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string text,
+            out int errorCode);
+
+        /// <summary>
+        /// Saves a PDF to file.
+        /// </summary>
+        /// <param name="handle">The PDF handle.</param>
+        /// <param name="path">UTF-8 null-terminated output file path.</param>
+        /// <param name="errorCode">Output parameter for error code.</param>
+        /// <returns>0 on success, non-zero on error.</returns>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention, CharSet = CharSet.Ansi)]
+        public static extern int PdfSave(
+            NativeHandle handle,
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string path,
+            out int errorCode);
+
+        /// <summary>
+        /// Saves a PDF to memory buffer.
+        /// </summary>
+        /// <param name="handle">The PDF handle.</param>
+        /// <param name="outputPtr">Output parameter for byte buffer pointer.</param>
+        /// <param name="outputLen">Output parameter for buffer size.</param>
+        /// <param name="errorCode">Output parameter for error code.</param>
+        /// <returns>0 on success, non-zero on error.</returns>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention)]
+        public static extern int PdfSaveToBytes(
+            NativeHandle handle,
+            out IntPtr outputPtr,
+            out ulong outputLen,
+            out int errorCode);
+
+        /// <summary>
+        /// Gets the page count from a Pdf handle.
+        /// </summary>
+        /// <param name="handle">The PDF handle.</param>
+        /// <param name="errorCode">Output parameter for error code.</param>
+        /// <returns>The page count, or -1 on error.</returns>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention)]
+        public static extern int PdfGetPageCount(
+            IntPtr handle,
+            out int errorCode);
+
+        /// <summary>
+        /// Frees a Pdf handle.
+        /// </summary>
+        /// <param name="handle">The handle to free.</param>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention)]
+        public static extern void PdfFree(IntPtr handle);
+
+        #endregion
+
+        #region DocumentEditor API
+
+        /// <summary>
+        /// Opens a PDF document for editing.
+        /// </summary>
+        /// <param name="path">UTF-8 null-terminated file path.</param>
+        /// <param name="errorCode">Output parameter for error code.</param>
+        /// <returns>Opaque handle to DocumentEditor, or null on error.</returns>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention, CharSet = CharSet.Ansi)]
+        public static extern NativeHandle DocumentEditorOpen(
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string path,
+            out int errorCode);
+
+        /// <summary>
+        /// Frees a DocumentEditor handle.
+        /// </summary>
+        /// <param name="handle">The handle to free.</param>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention)]
+        public static extern void DocumentEditorFree(IntPtr handle);
+
+        /// <summary>
+        /// Checks if the document has been modified.
+        /// </summary>
+        /// <param name="handle">The editor handle.</param>
+        /// <returns>True if modified, false otherwise.</returns>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention)]
+        [return: MarshalAs(UnmanagedType.I1)]
+        public static extern bool DocumentEditorIsModified(NativeHandle handle);
+
+        /// <summary>
+        /// Gets the source file path.
+        /// </summary>
+        /// <param name="handle">The editor handle.</param>
+        /// <param name="errorCode">Output parameter for error code.</param>
+        /// <returns>UTF-8 null-terminated string pointer (must be freed with FreeString).</returns>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention)]
+        public static extern IntPtr DocumentEditorGetSourcePath(
+            NativeHandle handle,
+            out int errorCode);
+
+        /// <summary>
+        /// Gets the PDF version.
+        /// </summary>
+        /// <param name="handle">The editor handle.</param>
+        /// <param name="major">Output parameter for major version number.</param>
+        /// <param name="minor">Output parameter for minor version number.</param>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention)]
+        public static extern void DocumentEditorGetVersion(
+            NativeHandle handle,
+            out byte major,
+            out byte minor);
+
+        /// <summary>
+        /// Gets the number of pages in the document.
+        /// </summary>
+        /// <param name="handle">The editor handle.</param>
+        /// <param name="errorCode">Output parameter for error code.</param>
+        /// <returns>The page count, or -1 on error.</returns>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention)]
+        public static extern int DocumentEditorGetPageCount(
+            IntPtr handle,
+            out int errorCode);
+
+        /// <summary>
+        /// Gets the document title.
+        /// </summary>
+        /// <param name="handle">The editor handle.</param>
+        /// <param name="errorCode">Output parameter for error code.</param>
+        /// <returns>UTF-8 null-terminated string pointer (must be freed with FreeString), or null if not set.</returns>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention)]
+        public static extern IntPtr DocumentEditorGetTitle(
+            IntPtr handle,
+            out int errorCode);
+
+        /// <summary>
+        /// Sets the document title.
+        /// </summary>
+        /// <param name="handle">The editor handle.</param>
+        /// <param name="title">UTF-8 null-terminated title string.</param>
+        /// <param name="errorCode">Output parameter for error code.</param>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention, CharSet = CharSet.Ansi)]
+        public static extern void DocumentEditorSetTitle(
+            IntPtr handle,
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string title,
+            out int errorCode);
+
+        /// <summary>
+        /// Gets the document author.
+        /// </summary>
+        /// <param name="handle">The editor handle.</param>
+        /// <param name="errorCode">Output parameter for error code.</param>
+        /// <returns>UTF-8 null-terminated string pointer (must be freed with FreeString), or null if not set.</returns>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention)]
+        public static extern IntPtr DocumentEditorGetAuthor(
+            IntPtr handle,
+            out int errorCode);
+
+        /// <summary>
+        /// Sets the document author.
+        /// </summary>
+        /// <param name="handle">The editor handle.</param>
+        /// <param name="author">UTF-8 null-terminated author string.</param>
+        /// <param name="errorCode">Output parameter for error code.</param>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention, CharSet = CharSet.Ansi)]
+        public static extern void DocumentEditorSetAuthor(
+            IntPtr handle,
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string author,
+            out int errorCode);
+
+        /// <summary>
+        /// Gets the document subject.
+        /// </summary>
+        /// <param name="handle">The editor handle.</param>
+        /// <param name="errorCode">Output parameter for error code.</param>
+        /// <returns>UTF-8 null-terminated string pointer (must be freed with FreeString), or null if not set.</returns>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention)]
+        public static extern IntPtr DocumentEditorGetSubject(
+            IntPtr handle,
+            out int errorCode);
+
+        /// <summary>
+        /// Sets the document subject.
+        /// </summary>
+        /// <param name="handle">The editor handle.</param>
+        /// <param name="subject">UTF-8 null-terminated subject string.</param>
+        /// <param name="errorCode">Output parameter for error code.</param>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention, CharSet = CharSet.Ansi)]
+        public static extern void DocumentEditorSetSubject(
+            IntPtr handle,
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string subject,
+            out int errorCode);
+
+        /// <summary>
+        /// Saves the document to a file.
+        /// </summary>
+        /// <param name="handle">The editor handle.</param>
+        /// <param name="path">UTF-8 null-terminated output file path.</param>
+        /// <param name="errorCode">Output parameter for error code.</param>
+        /// <returns>0 on success, non-zero on error.</returns>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention, CharSet = CharSet.Ansi)]
+        public static extern int DocumentEditorSave(
+            IntPtr handle,
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string path,
+            out int errorCode);
+
+        #endregion
+
         #region Utility Functions
+
+        /// <summary>
+        /// Frees a UTF-8 string allocated by Rust.
+        /// </summary>
+        /// <param name="ptr">Pointer to the string to free.</param>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention)]
+        public static extern void FreeString(IntPtr ptr);
+
+        /// <summary>
+        /// Frees a byte buffer allocated by Rust.
+        /// </summary>
+        /// <param name="ptr">Pointer to the buffer to free.</param>
+        /// <param name="len">Length of the buffer.</param>
+        [DllImport(LibName, CallingConvention = DefaultCallingConvention)]
+        public static extern void FreeBytes(IntPtr ptr, int len);
 
         /// <summary>
         /// Allocates a string in Rust memory.

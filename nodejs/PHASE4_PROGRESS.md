@@ -244,7 +244,7 @@ class TextSearcher {
 ### Creating Annotations
 
 ```javascript
-import { TextAnnotation, HighlightAnnotation, LinkAnnotation } from '@pdf-oxide/core';
+import { TextAnnotation, HighlightAnnotation, LinkAnnotation } from 'pdf_oxide';
 
 const pdf = Pdf.fromMarkdown('# Document');
 const page = pdf.page(0);
@@ -277,7 +277,7 @@ page.addAnnotation(link);
 ### Searching Text
 
 ```javascript
-import { TextSearcher } from '@pdf-oxide/core';
+import { TextSearcher } from 'pdf_oxide';
 
 const doc = PdfDocument.open('document.pdf');
 

@@ -290,7 +290,7 @@ Caught as specific error class (instanceof checks)
 The index.js file implements intelligent module loading:
 
 1. **Platform Detection** - Detects os.platform() and os.arch()
-2. **Optional Dependency Selection** - Chooses correct @pdf-oxide/platform-arch package
+2. **Optional Dependency Selection** - Chooses correct pdf_oxide-platform-arch package
 3. **Fallback Support** - Tries local binary in development
 4. **Clear Error Messages** - Tells user which platform is unsupported
 

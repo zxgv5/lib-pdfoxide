@@ -255,16 +255,16 @@ git push origin v1.0.0
 After publishing, users will install with:
 
 ```bash
-npm install @pdf-oxide/core
+npm install pdf_oxide
 ```
 
 Automatic platform detection will fetch the correct binary:
-- Windows x64: @pdf-oxide/win32-x64-msvc
-- Windows ARM64: @pdf-oxide/win32-arm64-msvc
-- macOS Intel: @pdf-oxide/darwin-x64
-- macOS Apple Silicon: @pdf-oxide/darwin-arm64
-- Linux x64: @pdf-oxide/linux-x64-gnu
-- Linux ARM64: @pdf-oxide/linux-arm64-gnu
+- Windows x64: pdf_oxide-win32-x64-msvc
+- Windows ARM64: pdf_oxide-win32-arm64-msvc
+- macOS Intel: pdf_oxide-darwin-x64
+- macOS Apple Silicon: pdf_oxide-darwin-arm64
+- Linux x64: pdf_oxide-linux-x64-gnu
+- Linux ARM64: pdf_oxide-linux-arm64-gnu
 
 ---
 
@@ -326,7 +326,7 @@ npm run clean             # Remove build artifacts
 ## Release Notes Template
 
 ```markdown
-# @pdf-oxide/core v1.0.0
+# pdf_oxide v1.0.0
 
 Complete Node.js/TypeScript bindings for pdf_oxide Rust library.
 

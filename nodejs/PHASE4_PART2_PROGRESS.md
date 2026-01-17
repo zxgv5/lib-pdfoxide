@@ -427,7 +427,7 @@ class DocumentInfo {
 ### Example 1: Creating a Form (JavaScript)
 
 ```javascript
-import { AcroForm, FormField } from '@pdf-oxide/core';
+import { AcroForm, FormField } from 'pdf_oxide';
 
 const form = AcroForm.new('EmployeeForm');
 
@@ -477,7 +477,7 @@ console.log(`Has signatures: ${form.has_signature_fields()}`);
 ### Example 2: Document Metadata (TypeScript)
 
 ```typescript
-import { XMPMetadata, Pdf } from '@pdf-oxide/core';
+import { XMPMetadata, Pdf } from 'pdf_oxide';
 
 const doc = Pdf.fromMarkdown('# My Document\n\nContent here');
 
@@ -504,7 +504,7 @@ doc.save('report.pdf');
 ### Example 3: Page Labels (TypeScript)
 
 ```typescript
-import { PageLabel } from '@pdf-oxide/core';
+import { PageLabel } from 'pdf_oxide';
 
 // Front matter with Roman numerals
 const introPage = PageLabel.new(0);
@@ -533,7 +533,7 @@ console.log(appendixPage.get_label_text());   // "Appendix-A"
 ### Example 4: Embedded Files (JavaScript)
 
 ```javascript
-import { EmbeddedFile } from '@pdf-oxide/core';
+import { EmbeddedFile } from 'pdf_oxide';
 
 // Create embedded file reference
 const attachedReport = EmbeddedFile.new(

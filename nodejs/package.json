@@ -1,5 +1,5 @@
 {
-  "name": "@pdf-oxide/core",
+  "name": "pdf_oxide",
   "version": "1.0.0",
   "description": "Node.js/TypeScript bindings for pdf_oxide Rust library - Complete PDF toolkit for extraction, creation, and editing",
   "main": "index.js",
@@ -62,12 +62,12 @@
     "typescript": "^5.3.0"
   },
   "optionalDependencies": {
-    "@pdf-oxide/darwin-x64": "1.0.0",
-    "@pdf-oxide/darwin-arm64": "1.0.0",
-    "@pdf-oxide/linux-x64-gnu": "1.0.0",
-    "@pdf-oxide/linux-arm64-gnu": "1.0.0",
-    "@pdf-oxide/win32-x64-msvc": "1.0.0",
-    "@pdf-oxide/win32-arm64-msvc": "1.0.0"
+    "pdf_oxide-darwin-x64": "1.0.0",
+    "pdf_oxide-darwin-arm64": "1.0.0",
+    "pdf_oxide-linux-x64-gnu": "1.0.0",
+    "pdf_oxide-linux-arm64-gnu": "1.0.0",
+    "pdf_oxide-win32-x64-msvc": "1.0.0",
+    "pdf_oxide-win32-arm64-msvc": "1.0.0"
   },
   "files": [
     "index.js",

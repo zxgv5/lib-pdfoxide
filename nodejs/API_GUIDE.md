@@ -924,7 +924,7 @@ import {
   PdfIoError,
   PdfParseError,
   PdfEncryptionError,
-} from '@pdf-oxide/core';
+} from 'pdf_oxide';
 
 try {
   const doc = PdfDocument.open('document.pdf');

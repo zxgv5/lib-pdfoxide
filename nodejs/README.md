@@ -24,7 +24,7 @@ Complete Node.js/TypeScript bindings for [pdf_oxide](https://github.com/yfedosee
 ## Installation
 
 ```bash
-npm install @pdf-oxide/core
+npm install pdf_oxide
 ```
 
 This automatically installs the correct native binary for your platform.
@@ -34,7 +34,7 @@ This automatically installs the correct native binary for your platform.
 ### Reading and Text Extraction
 
 ```javascript
-import { PdfDocument } from '@pdf-oxide/core';
+import { PdfDocument } from 'pdf_oxide';
 
 using doc = PdfDocument.open('document.pdf');
 
@@ -46,7 +46,7 @@ const markdown = doc.toMarkdown(0);
 ### Creating PDFs
 
 ```javascript
-import { Pdf, PdfBuilder } from '@pdf-oxide/core';
+import { Pdf, PdfBuilder } from 'pdf_oxide';
 
 // Simple creation
 using doc = Pdf.fromMarkdown('# Hello\n\nWorld');
@@ -63,7 +63,7 @@ await doc2.saveAsync('output.pdf');
 ### Editing PDFs
 
 ```javascript
-import { Pdf } from '@pdf-oxide/core';
+import { Pdf } from 'pdf_oxide';
 
 using doc = Pdf.open('input.pdf');
 const page = doc.page(0);
@@ -245,7 +245,7 @@ All errors extend the base `PdfError` class:
 ### Working with Forms
 
 ```javascript
-import { Pdf, AcroForm } from '@pdf-oxide/core';
+import { Pdf, AcroForm } from 'pdf_oxide';
 
 const doc = Pdf.fromText('Application Form');
 const form = AcroForm.new('AppForm');
@@ -284,7 +284,7 @@ doc.save('form.pdf');
 ### Working with Metadata
 
 ```javascript
-import { Pdf, XMPMetadata } from '@pdf-oxide/core';
+import { Pdf, XMPMetadata } from 'pdf_oxide';
 
 const doc = Pdf.fromMarkdown('# Report\n\nContent');
 
@@ -309,7 +309,7 @@ console.log(`Version: ${info.version}`);
 ### Working with Annotations
 
 ```javascript
-import { Pdf } from '@pdf-oxide/core';
+import { Pdf } from 'pdf_oxide';
 
 const doc = Pdf.fromMarkdown('# Important Document\n\nRead carefully.');
 const page = doc.page(0);
@@ -353,7 +353,7 @@ console.log(`Extracted ${pages.length} pages`);
 ### DOM-like Editing
 
 ```javascript
-import { Pdf } from '@pdf-oxide/core';
+import { Pdf } from 'pdf_oxide';
 
 using doc = Pdf.open('input.pdf');
 const page = doc.page(0);
@@ -374,7 +374,7 @@ doc.save('output.pdf');
 ### Full-Text Search
 
 ```javascript
-import { Pdf } from '@pdf-oxide/core';
+import { Pdf } from 'pdf_oxide';
 
 using doc = Pdf.open('document.pdf');
 const page = doc.page(0);
@@ -398,7 +398,7 @@ import {
   PdfIoError,
   PdfParseError,
   PdfEncryptionError
-} from '@pdf-oxide/core';
+} from 'pdf_oxide';
 
 try {
   using doc = PdfDocument.open('document.pdf');
@@ -487,7 +487,7 @@ CARGO_BUILD_FLAGS="--features all" npm run build
 Full TypeScript definitions are auto-generated from Rust:
 
 ```typescript
-import { PdfDocument, ConversionOptions } from '@pdf-oxide/core';
+import { PdfDocument, ConversionOptions } from 'pdf_oxide';
 
 const doc = PdfDocument.open('document.pdf');
 const options: ConversionOptions = {

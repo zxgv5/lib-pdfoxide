@@ -4,16 +4,16 @@ const { platform, arch } = process;
 
 const PLATFORMS = {
   'darwin': {
-    'x64': '@pdf-oxide/darwin-x64',
-    'arm64': '@pdf-oxide/darwin-arm64',
+    'x64': 'pdf_oxide-darwin-x64',
+    'arm64': 'pdf_oxide-darwin-arm64',
   },
   'linux': {
-    'x64': '@pdf-oxide/linux-x64-gnu',
-    'arm64': '@pdf-oxide/linux-arm64-gnu',
+    'x64': 'pdf_oxide-linux-x64-gnu',
+    'arm64': 'pdf_oxide-linux-arm64-gnu',
   },
   'win32': {
-    'x64': '@pdf-oxide/win32-x64-msvc',
-    'arm64': '@pdf-oxide/win32-arm64-msvc',
+    'x64': 'pdf_oxide-win32-x64-msvc',
+    'arm64': 'pdf_oxide-win32-arm64-msvc',
   },
 };
 

@@ -228,18 +228,18 @@ pdf_oxide-nodejs (v1.0.0)
 
 ### npm Package Structure
 ```
-@pdf-oxide/core (main package)
+pdf_oxide (main package)
 ├── index.js (native module loader)
 ├── index.d.ts (auto-generated TypeScript definitions)
 ├── README.md
 └── API_GUIDE.md
 
-@pdf-oxide/darwin-x64 (optional platform package)
-@pdf-oxide/darwin-arm64 (optional platform package)
-@pdf-oxide/linux-x64-gnu (optional platform package)
-@pdf-oxide/linux-arm64-gnu (optional platform package)
-@pdf-oxide/win32-x64-msvc (optional platform package)
-@pdf-oxide/win32-arm64-msvc (optional platform package)
+pdf_oxide-darwin-x64 (optional platform package)
+pdf_oxide-darwin-arm64 (optional platform package)
+pdf_oxide-linux-x64-gnu (optional platform package)
+pdf_oxide-linux-arm64-gnu (optional platform package)
+pdf_oxide-win32-x64-msvc (optional platform package)
+pdf_oxide-win32-arm64-msvc (optional platform package)
 ```
 
 ### Build Pipeline (GitHub Actions)
@@ -254,9 +254,9 @@ On Push to main:
 
 ### Installation Experience
 ```bash
-$ npm install @pdf-oxide/core
+$ npm install pdf_oxide
 $ npm notice created a lockfile as package-lock.json
-$ npm WARN @pdf-oxide/core@1.0.0 requires peer dependency typescript
+$ npm WARN pdf_oxide@1.0.0 requires peer dependency typescript
 $ npm install typescript --save-dev
 $ # Automatically downloads correct platform binary
 ```

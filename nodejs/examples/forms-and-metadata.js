@@ -14,7 +14,7 @@ import {
   XMPMetadata,
   PageLabel,
   EmbeddedFile,
-} from '@pdf-oxide/core';
+} from 'pdf_oxide';
 
 console.log('=== PDF Forms and Metadata Example ===\n');
 

@@ -10,7 +10,7 @@ use pdf_oxide::reader::PdfDocument as PdfDocumentImpl;
 ///
 /// # Examples
 /// ```javascript
-/// import { PdfDocument } from '@pdf-oxide/core';
+/// import { PdfDocument } from 'pdf_oxide';
 ///
 /// using doc = PdfDocument.open('document.pdf');
 /// console.log(`Pages: ${doc.pageCount}`);

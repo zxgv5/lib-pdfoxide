@@ -7,7 +7,7 @@
  * - Result positioning and confidence
  */
 
-import { Pdf, TextSearcher } from '@pdf-oxide/core';
+import { Pdf, TextSearcher } from 'pdf_oxide';
 
 console.log('=== Annotations and Search Example ===\n');
 

@@ -438,7 +438,7 @@ import {
   XMPMetadata,
   PageLabel,
   EmbeddedFile,
-} from '@pdf-oxide/core';
+} from 'pdf_oxide';
 
 // Create document
 const doc = Pdf.fromMarkdown(`
@@ -497,7 +497,7 @@ doc.save('annual_report.pdf');
 ### Reading and Processing Complex PDF
 
 ```javascript
-import { PdfDocument } from '@pdf-oxide/core';
+import { PdfDocument } from 'pdf_oxide';
 
 using doc = PdfDocument.open('business_document.pdf');
 

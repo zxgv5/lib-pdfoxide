@@ -9,7 +9,7 @@
     <!-- NuGet Package Configuration -->
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
     <PackageId>PdfOxide</PackageId>
-    <Version>1.0.0</Version>
+    <Version>0.3.2</Version>
     <Title>PdfOxide</Title>
     <Authors>pdf_oxide Contributors</Authors>
     <Company>pdf_oxide Project</Company>
@@ -23,14 +23,17 @@
 
     <!-- Release Notes -->
     <PackageReleaseNotes>
-v1.0.0 - Initial Release
-- Phase 1: Core PDF reading API with PdfDocument for text extraction and format conversion
-- Phase 2: PDF creation with Pdf/PdfBuilder classes and DocumentEditor for PDF modification
-- Phase 3: Advanced DOM access with 5 element types and 28 annotation types, full text search
-- Phase 4: Comprehensive testing framework (107 unit tests) and performance benchmarks (61 benchmarks)
-- Phase 5: Real test fixtures, production benchmark implementation, CI/CD integration
+v0.3.2 - Synchronized Release with All Language Bindings
+- Node.js/TypeScript bindings added with napi-rs (100% feature parity)
+- All language bindings synchronized to 0.3.2
+- Complete feature parity verification across Rust, Python, C#, and Node.js
+- Phase 1-4: Complete API coverage for all languages
+- C#: Idiomatic P/Invoke-based FFI with SafeHandle, IDisposable, async/await, LINQ support
+- Node.js: napi-rs bindings with auto-generated TypeScript definitions
+- Python: PyO3 bindings with native typing support
+- Rust: Full 0.3.2 core library with all features
 
-Fully idiomatic C# with P/Invoke-based FFI, SafeHandle resource management, IDisposable pattern, async/await support, LINQ-friendly collections, and comprehensive error handling.
+All language bindings now provide complete feature parity with comprehensive error handling and idiomatic patterns.
     </PackageReleaseNotes>
 
     <!-- Licensing -->

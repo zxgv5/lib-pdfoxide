@@ -4,7 +4,7 @@ resolver = "2"
 
 [package]
 name = "pdf_oxide"
-version = "0.3.1"
+version = "0.3.2"
 edition = "2021"
 authors = ["Yury Fedoseev <yfedoseev@gmail.com>"]
 license = "MIT OR Apache-2.0"

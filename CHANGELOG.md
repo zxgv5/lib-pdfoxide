@@ -2,6 +2,21 @@
 
 All notable changes to PDFOxide are documented here.
 
+## [0.3.18] - 2026-03-08
+> Enhanced Python Feature Set and Improved Out-of-Box Experience
+
+### Features
+
+- **Batteries-Included Python Bindings** — The Python \`python\` feature now automatically enables key functionality including page rendering, parallel extraction, digital signatures, barcodes, and office document conversion by default. This resolves issues where users encountered \`RuntimeError: Rendering feature not enabled\` when attempting to use standard APIs. (#240)
+
+### Bug Fixes
+
+- **Fixed Python Rendering Accessibility** (#240) — Resolved an issue where the \`render_page\` method was unreachable in standard Python builds due to the rendering feature being opt-in rather than default.
+
+### 🏆 Community Contributors
+
+🥇 **@tiennh-h2** — Thank you for reporting the rendering accessibility issue (#240). Your feedback helped us identify that our Python distribution was too minimal, leading to an improved \"batteries-included\" experience for all Python users! 🚀
+
 ## [0.3.17] - 2026-03-08
 > Stable Recursion and Refined Table Heuristics
 

@@ -151,6 +151,9 @@ impl PageRenderer {
         // Execute operators and render
         self.execute_operators(&mut pixmap, transform, &operators, doc, page_num, &resources)?;
 
+        // Render annotations (especially important for docs that use them for main content)
+        self.render_annotations(&mut pixmap, transform, doc, page_num)?;
+
         // Encode to output format
         let data = match self.options.format {
             ImageFormat::Png => pixmap
@@ -485,30 +488,14 @@ impl PageRenderer {
                         let clip = clip_stack.last().and_then(|c| c.as_ref());
                         let gs = gs_stack.current();
                         let transform = combine_transforms(base_transform, &gs.ctm);
-                        self.text_rasterizer
+                        let advance = self
+                            .text_rasterizer
                             .render_text(pixmap, text, transform, gs, resources, doc, clip)?;
 
-                        // Advance text position per PDF spec §9.4.4:
-                        // tx = ((w0 - Tj/1000) × Tfs + Tc + Tw) × Th
-                        // Using w0=600 (default glyph width) for each character
+                        // Advance text position
                         let gs_mut = gs_stack.current_mut();
-                        let font_size = gs_mut.font_size;
-                        let h_scale = gs_mut.horizontal_scaling / 100.0;
-                        let char_space = gs_mut.char_space;
-                        let word_space = gs_mut.word_space;
-                        let w0: f32 = 600.0; // Default glyph width in 1/1000 units
-
-                        let mut total_tx: f32 = 0.0;
-                        for &byte in text.iter() {
-                            let tx = (w0 / 1000.0 * font_size + char_space) * h_scale;
-                            total_tx += tx;
-                            // Add word spacing for space characters (byte 32)
-                            if byte == 32 {
-                                total_tx += word_space * h_scale;
-                            }
-                        }
-                        let advance = Matrix::translation(total_tx, 0.0);
-                        gs_mut.text_matrix = gs_mut.text_matrix.multiply(&advance);
+                        let advance_matrix = Matrix::translation(advance, 0.0);
+                        gs_mut.text_matrix = gs_mut.text_matrix.multiply(&advance_matrix);
                     }
                 },
                 Operator::TJ { array } => {
@@ -516,8 +503,14 @@ impl PageRenderer {
                         let clip = clip_stack.last().and_then(|c| c.as_ref());
                         let gs = gs_stack.current();
                         let transform = combine_transforms(base_transform, &gs.ctm);
-                        self.text_rasterizer
+                        let advance = self
+                            .text_rasterizer
                             .render_tj_array(pixmap, array, transform, gs, resources, doc, clip)?;
+
+                        // Advance text position
+                        let gs_mut = gs_stack.current_mut();
+                        let advance_matrix = Matrix::translation(advance, 0.0);
+                        gs_mut.text_matrix = gs_mut.text_matrix.multiply(&advance_matrix);
                     }
                 },
                 Operator::DoubleQuote {
@@ -580,14 +573,23 @@ impl PageRenderer {
 
                     if let Object::Stream { dict, data } = xobj {
                         // Check subtype
-                        if let Some(Object::Name(subtype)) = dict.get("Subtype") {
-                            match subtype.as_str() {
+                        if let Some(subtype) = dict.get("Subtype").and_then(|o| o.as_name()) {
+                            match subtype {
                                 "Image" => {
                                     self.render_image(pixmap, &dict, &data, transform, clip_mask)?;
                                 },
                                 "Form" => {
+                                    // Form XObjects can have their own Resources dictionary.
+                                    // If present, use them; otherwise fall back to parent resources.
+                                    let form_resources = dict.get("Resources").unwrap_or(resources);
                                     self.render_form_xobject(
-                                        pixmap, &dict, &data, transform, doc, page_num, resources,
+                                        pixmap,
+                                        &dict,
+                                        &data,
+                                        transform,
+                                        doc,
+                                        page_num,
+                                        form_resources,
                                     )?;
                                 },
                                 _ => {},
@@ -688,13 +690,18 @@ impl PageRenderer {
 
         // Get form's /Resources (or fall back to parent resources)
         let form_resources = if let Some(res) = dict.get("Resources") {
-            res.clone()
+            doc.resolve_object(res)?
         } else {
             parent_resources.clone()
         };
 
         // Parse form content stream
-        let operators = parse_content_stream(data)?;
+        let operators = match parse_content_stream(data) {
+            Ok(ops) => ops,
+            Err(e) => {
+                return Err(e);
+            },
+        };
 
         // Execute operators with the combined transform and form resources
         self.execute_operators(
@@ -846,6 +853,57 @@ impl PageRenderer {
             .map_err(|e| Error::InvalidPdf(format!("JPEG encoding failed: {}", e)))?;
 
         Ok(output.into_inner())
+    }
+
+    /// Render annotations for a page.
+    fn render_annotations(
+        &mut self,
+        pixmap: &mut Pixmap,
+        base_transform: Transform,
+        doc: &mut PdfDocument,
+        page_num: usize,
+    ) -> Result<()> {
+        let annots = doc.get_annotations(page_num)?;
+        if annots.is_empty() {
+            return Ok(());
+        }
+
+        for annot in annots {
+            // Get normal appearance stream (/AP /N)
+            if let Some(raw_dict) = &annot.raw_dict {
+                if let Some(Object::Dictionary(ap)) = raw_dict.get("AP") {
+                    if let Some(n_entry) = ap.get("N") {
+                        // N can be a stream or a dictionary of streams
+                        let ap_stream_obj = if let Some(ref_val) = n_entry.as_reference() {
+                            doc.resolve_object(&Object::Reference(ref_val))?
+                        } else {
+                            n_entry.clone()
+                        };
+
+                        if let Object::Stream { dict, data } = ap_stream_obj {
+                            // Render the appearance stream as a Form XObject
+                            // Transform to annotation rectangle
+                            if let Some(rect) = annot.rect {
+                                let x = rect[0] as f32;
+                                let y = rect[1] as f32;
+                                let annot_transform = base_transform.post_translate(x, y);
+                                self.render_form_xobject(
+                                    pixmap,
+                                    &dict,
+                                    &data,
+                                    annot_transform,
+                                    doc,
+                                    page_num,
+                                    &Object::Dictionary(std::collections::HashMap::new()), // Resources will be loaded from stream dict
+                                )?;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(())
     }
 }
 

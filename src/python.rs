@@ -1779,6 +1779,10 @@ impl PyOfficeConverter {
 #[cfg(feature = "office")]
 #[pymethods]
 impl PyOfficeConverter {
+    #[new]
+    fn new() -> Self {
+        PyOfficeConverter
+    }
     #[staticmethod]
     fn from_docx(path: &str) -> PyResult<PyPdf> {
         let res = RustOfficeConverter::new()

@@ -181,6 +181,14 @@ md-5 = "0.11"      # MD5 for key derivation
 sha2 = "0.11"      # SHA-256 for newer encryption
 stringprep = "0.1" # SASLprep for Unicode PDF passwords (R>=5)
 
+# FIPS-validated CryptoProvider backend (issue #236).
+# `aws-lc-rs` is Amazon's BoringSSL fork; the `fips` feature gates it
+# to NIST FIPS 140-3 algorithms only (validated 2024). Optional
+# because compiling AWS-LC source adds ~5 minutes to a fresh build.
+# Enable via `--features crypto-aws-lc` (default: off, falls back to
+# `RustCryptoProvider`).
+aws-lc-rs = { version = "1", optional = true }
+
 # Digital signatures (optional)
 # NOTE: der/spki/pkcs1/pkcs8/rsa/signature/cms are pinned to 0.7/0.9/0.10/2.x track.
 # der 0.8 + spki 0.8 are stable but the rest of the RustCrypto 0.8 stack
@@ -285,6 +293,16 @@ default = ["icc"]
 
 # Enable logging for the extraction pipeline
 logging = []
+
+# FIPS 140-3 validated cryptographic backend (issue #236).
+# When enabled, opt into `AwsLcProvider` (Amazon's `aws-lc-rs` with
+# the `fips` feature) as an alternative to the default
+# `RustCryptoProvider`. Pulls in the AWS-LC C source — fresh builds
+# add ~5 minutes. The provider must still be installed at runtime
+# via `pdf_oxide::crypto::set_provider(...)` in your application's
+# main(); compiling with this feature alone does not change the
+# default behaviour.
+crypto-aws-lc = ["dep:aws-lc-rs"]
 
 # Real ICC colour management via qcms (Firefox's colour engine).
 # When enabled, ICCBased colour spaces and CMYK images are converted

@@ -18,12 +18,16 @@
 //! Tracking issue: <https://github.com/yfedoseev/pdf_oxide/issues/236>.
 
 mod active;
+#[cfg(feature = "crypto-aws-lc")]
+mod aws_lc_provider;
 mod error;
 mod provider;
 mod rust_provider;
 mod types;
 
 pub use active::{active, is_set, set_provider, SetProviderError};
+#[cfg(feature = "crypto-aws-lc")]
+pub use aws_lc_provider::AwsLcProvider;
 pub use error::{not_permitted, AlgorithmKind, Error, Result};
 pub use provider::{
     CryptoProvider, Hasher, SignatureVerifier, Signer, SigningKeyMaterial, SymmetricCipher,

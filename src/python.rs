@@ -7174,7 +7174,65 @@ fn pdf_oxide(m: &Bound<'_, PyModule>) -> PyResult<()> {
     #[cfg(feature = "barcodes")]
     m.add_function(pyo3::wrap_pyfunction!(generate_qr_svg, m)?)?;
     m.add("VERSION", env!("CARGO_PKG_VERSION"))?;
+    // Cryptographic-provider surface (issue #236) — exposes the
+    // FIPS-validated AwsLcProvider as a runtime opt-in. Functions
+    // (not classes) so callers don't need to instantiate Rust types.
+    m.add_function(pyo3::wrap_pyfunction!(crypto_active_provider, m)?)?;
+    m.add_function(pyo3::wrap_pyfunction!(crypto_available_providers, m)?)?;
+    m.add_function(pyo3::wrap_pyfunction!(crypto_use_fips, m)?)?;
     Ok(())
+}
+
+/// Return the name of the currently active cryptographic provider
+/// (`"rust-crypto"` for the default permissive provider, or
+/// `"aws-lc-rs"` for the FIPS-validated provider once installed via
+/// :func:`crypto_use_fips`). Issue #236.
+#[pyo3::pyfunction]
+fn crypto_active_provider() -> String {
+    crate::crypto::active().name().to_string()
+}
+
+/// List the cryptographic providers compiled into this build.
+///
+/// Always contains ``"rust-crypto"`` (the default permissive
+/// provider). Also contains ``"aws-lc-rs"`` when the wheel was built
+/// with ``--features crypto-aws-lc`` — the FIPS 140-3 validated path.
+#[pyo3::pyfunction]
+fn crypto_available_providers() -> Vec<String> {
+    let v = vec!["rust-crypto".to_string()];
+    #[cfg(feature = "crypto-aws-lc")]
+    let v = {
+        let mut v = v;
+        v.push("aws-lc-rs".to_string());
+        v
+    };
+    v
+}
+
+/// Install the FIPS-validated ``aws-lc-rs`` provider as the
+/// process-wide active cryptographic backend.
+///
+/// Must be called before any PDF operation that uses crypto (open
+/// encrypted document, verify signature). Set-once: a second call,
+/// or any call after a default provider was lazily-installed,
+/// raises ``RuntimeError`` with reason ``"already set"``.
+///
+/// Raises ``RuntimeError("FIPS feature not compiled in")`` when the
+/// wheel was built without ``--features crypto-aws-lc``.
+#[pyo3::pyfunction]
+fn crypto_use_fips() -> pyo3::PyResult<()> {
+    #[cfg(feature = "crypto-aws-lc")]
+    {
+        use std::sync::Arc;
+        crate::crypto::set_provider(Arc::new(crate::crypto::AwsLcProvider::new()))
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))
+    }
+    #[cfg(not(feature = "crypto-aws-lc"))]
+    {
+        Err(pyo3::exceptions::PyRuntimeError::new_err(
+            "FIPS provider not compiled in; build wheel with --features crypto-aws-lc",
+        ))
+    }
 }
 
 /// Sign raw PDF bytes and return the signed PDF as `bytes`.

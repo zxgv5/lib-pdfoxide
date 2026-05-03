@@ -14,7 +14,7 @@
     ],
     "component": {
       "type": "application",
-      "bom-ref": "path+file:///home/yfedoseev/projects/pdf_oxide_fixes/pdf_oxide_cli#0.3.43",
+      "bom-ref": "path+file://./pdf_oxide_cli#0.3.43",
       "name": "pdf_oxide_cli",
       "version": "0.3.43",
       "description": "CLI for pdf-oxide — the fastest PDF toolkit. 22 commands: text extraction, PDF to markdown, search, merge, split, images, compress, encrypt, watermark, forms, and more.",
@@ -42,14 +42,14 @@
       "components": [
         {
           "type": "library",
-          "bom-ref": "path+file:///home/yfedoseev/projects/pdf_oxide_fixes/pdf_oxide_cli#0.3.43 bin-target-0",
+          "bom-ref": "path+file://./pdf_oxide_cli#0.3.43 bin-target-0",
           "name": "pdf_oxide_cli",
           "version": "0.3.43",
           "purl": "pkg:cargo/pdf_oxide_cli@0.3.43?download_url=file://.#src/lib.rs"
         },
         {
           "type": "application",
-          "bom-ref": "path+file:///home/yfedoseev/projects/pdf_oxide_fixes/pdf_oxide_cli#0.3.43 bin-target-1",
+          "bom-ref": "path+file://./pdf_oxide_cli#0.3.43 bin-target-1",
           "name": "pdf-oxide",
           "version": "0.3.43",
           "purl": "pkg:cargo/pdf_oxide_cli@0.3.43?download_url=file://.#src/main.rs"
@@ -66,7 +66,7 @@
   "components": [
     {
       "type": "library",
-      "bom-ref": "path+file:///home/yfedoseev/projects/pdf_oxide_fixes#pdf_oxide@0.3.43",
+      "bom-ref": "path+file://.#pdf_oxide@0.3.43",
       "author": "Yury Fedoseev <yfedoseev@gmail.com>",
       "name": "pdf_oxide",
       "version": "0.3.43",
@@ -4485,7 +4485,7 @@
   ],
   "dependencies": [
     {
-      "ref": "path+file:///home/yfedoseev/projects/pdf_oxide_fixes#pdf_oxide@0.3.43",
+      "ref": "path+file://.#pdf_oxide@0.3.43",
       "dependsOn": [
         "registry+https://github.com/rust-lang/crates.io-index#aes@0.9.0",
         "registry+https://github.com/rust-lang/crates.io-index#base64@0.22.1",
@@ -4529,11 +4529,11 @@
       ]
     },
     {
-      "ref": "path+file:///home/yfedoseev/projects/pdf_oxide_fixes/pdf_oxide_cli#0.3.43",
+      "ref": "path+file://./pdf_oxide_cli#0.3.43",
       "dependsOn": [
         "registry+https://github.com/rust-lang/crates.io-index#clap@4.6.1",
         "registry+https://github.com/rust-lang/crates.io-index#is-terminal@0.4.17",
-        "path+file:///home/yfedoseev/projects/pdf_oxide_fixes#pdf_oxide@0.3.43",
+        "path+file://.#pdf_oxide@0.3.43",
         "registry+https://github.com/rust-lang/crates.io-index#serde_json@1.0.149"
       ]
     },

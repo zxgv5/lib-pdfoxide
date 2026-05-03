@@ -1940,6 +1940,12 @@ Napi::Value RenderPageZoom(const Napi::CallbackInfo& info) {
 // dimensions are ≤ the target box. Issue #448.
 Napi::Value RenderPageFit(const Napi::CallbackInfo& info) {
   Napi::Env env = info.Env();
+  if (info.Length() < 4 || !info[0].IsExternal() || !info[1].IsNumber()
+      || !info[2].IsNumber() || !info[3].IsNumber()
+      || (info.Length() > 4 && !info[4].IsNumber())) {
+    throw Napi::TypeError::New(env,
+        "renderPageFit(handle, pageIndex, width, height [, format]) — wrong arity or types");
+  }
   void* handle = info[0].As<Napi::External<void>>().Data();
   int pageIndex = info[1].As<Napi::Number>().Int32Value();
   int width = info[2].As<Napi::Number>().Int32Value();

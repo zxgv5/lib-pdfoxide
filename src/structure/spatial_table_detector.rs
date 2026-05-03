@@ -1022,8 +1022,11 @@ fn has_split_modal_column_groups(grid: &GridStructure, most_common_count: usize)
         return false;
     }
 
+    // Floor at 2 rows so a single-row outlier with a wide/narrow mask
+    // can never be classified as its own "significant" component
+    // — when modal_masks.len() == 4 the share alone would round to 1.
     let min_component_rows =
-        ((modal_masks.len() as f32) * MIN_SPLIT_GROUP_ROW_SHARE).ceil() as usize;
+        (((modal_masks.len() as f32) * MIN_SPLIT_GROUP_ROW_SHARE).ceil() as usize).max(2);
 
     // Build column adjacency: two columns are adjacent iff they ever
     // co-occur in the same modal row.

@@ -884,11 +884,19 @@ namespace PdfOxide.Core
         public byte[] RenderPageFit(int pageIndex, int fitWidth, int fitHeight, int format = 0)
         {
             ThrowIfDisposed();
-            if (fitWidth <= 0 || fitHeight <= 0)
+            if (fitWidth <= 0)
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(fitWidth),
-                    $"fitWidth and fitHeight must be > 0, got {fitWidth}x{fitHeight}");
+                    fitWidth,
+                    $"fitWidth must be > 0, got {fitWidth}");
+            }
+            if (fitHeight <= 0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(fitHeight),
+                    fitHeight,
+                    $"fitHeight must be > 0, got {fitHeight}");
             }
             var imgHandle = NativeMethods.pdf_render_page_fit(_handle.Ptr, pageIndex, fitWidth, fitHeight, format, out var errorCode);
             ExceptionMapper.ThrowIfError(errorCode);

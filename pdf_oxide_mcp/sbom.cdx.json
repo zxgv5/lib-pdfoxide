@@ -14,7 +14,7 @@
     ],
     "component": {
       "type": "application",
-      "bom-ref": "path+file:///home/yfedoseev/projects/pdf_oxide_fixes/pdf_oxide_mcp#0.3.43",
+      "bom-ref": "path+file://./pdf_oxide_mcp#0.3.43",
       "name": "pdf_oxide_mcp",
       "version": "0.3.43",
       "description": "MCP server for PDF extraction — gives Claude, Cursor, and AI assistants the ability to read PDFs locally. Text, markdown, and HTML output. Powered by pdf_oxide.",
@@ -42,7 +42,7 @@
       "components": [
         {
           "type": "application",
-          "bom-ref": "path+file:///home/yfedoseev/projects/pdf_oxide_fixes/pdf_oxide_mcp#0.3.43 bin-target-0",
+          "bom-ref": "path+file://./pdf_oxide_mcp#0.3.43 bin-target-0",
           "name": "pdf-oxide-mcp",
           "version": "0.3.43",
           "purl": "pkg:cargo/pdf_oxide_mcp@0.3.43?download_url=file://.#src/main.rs"
@@ -59,7 +59,7 @@
   "components": [
     {
       "type": "library",
-      "bom-ref": "path+file:///home/yfedoseev/projects/pdf_oxide_fixes#pdf_oxide@0.3.43",
+      "bom-ref": "path+file://.#pdf_oxide@0.3.43",
       "author": "Yury Fedoseev <yfedoseev@gmail.com>",
       "name": "pdf_oxide",
       "version": "0.3.43",
@@ -4282,7 +4282,7 @@
   ],
   "dependencies": [
     {
-      "ref": "path+file:///home/yfedoseev/projects/pdf_oxide_fixes#pdf_oxide@0.3.43",
+      "ref": "path+file://.#pdf_oxide@0.3.43",
       "dependsOn": [
         "registry+https://github.com/rust-lang/crates.io-index#aes@0.9.0",
         "registry+https://github.com/rust-lang/crates.io-index#base64@0.22.1",
@@ -4326,9 +4326,9 @@
       ]
     },
     {
-      "ref": "path+file:///home/yfedoseev/projects/pdf_oxide_fixes/pdf_oxide_mcp#0.3.43",
+      "ref": "path+file://./pdf_oxide_mcp#0.3.43",
       "dependsOn": [
-        "path+file:///home/yfedoseev/projects/pdf_oxide_fixes#pdf_oxide@0.3.43",
+        "path+file://.#pdf_oxide@0.3.43",
         "registry+https://github.com/rust-lang/crates.io-index#serde_json@1.0.149"
       ]
     },

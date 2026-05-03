@@ -349,16 +349,14 @@ impl PyPdfDocument {
 
             let mut options = crate::rendering::RenderOptions::with_dpi(dpi.unwrap_or(72));
             if let Some(fmt) = format {
-                match fmt.to_lowercase().as_str() {
-                    "jpeg" | "jpg" => {
-                        options = options.as_jpeg(quality);
-                    },
-                    "png" => { /* default */ },
-                    _ => {
-                        return Err(PyValueError::new_err(format!(
-                            "format must be 'png' or 'jpeg', got {fmt:?}",
-                        )))
-                    },
+                if fmt.eq_ignore_ascii_case("jpeg") || fmt.eq_ignore_ascii_case("jpg") {
+                    options = options.as_jpeg(quality);
+                } else if fmt.eq_ignore_ascii_case("png") {
+                    // default — no change
+                } else {
+                    return Err(PyValueError::new_err(format!(
+                        "format must be 'png' or 'jpeg', got {fmt:?}",
+                    )));
                 }
             }
             if let Some((r, g, b, a)) = background {
@@ -437,16 +435,14 @@ impl PyPdfDocument {
 
             let mut options = crate::rendering::RenderOptions::default();
             if let Some(fmt) = format {
-                match fmt.to_lowercase().as_str() {
-                    "jpeg" | "jpg" => {
-                        options = options.as_jpeg(quality);
-                    },
-                    "png" => { /* default */ },
-                    _ => {
-                        return Err(PyValueError::new_err(format!(
-                            "format must be 'png' or 'jpeg', got {fmt:?}",
-                        )))
-                    },
+                if fmt.eq_ignore_ascii_case("jpeg") || fmt.eq_ignore_ascii_case("jpg") {
+                    options = options.as_jpeg(quality);
+                } else if fmt.eq_ignore_ascii_case("png") {
+                    // default — no change
+                } else {
+                    return Err(PyValueError::new_err(format!(
+                        "format must be 'png' or 'jpeg', got {fmt:?}",
+                    )));
                 }
             }
             if let Some((r, g, b, a)) = background {

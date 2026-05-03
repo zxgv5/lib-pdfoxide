@@ -1641,23 +1641,40 @@ fn downgrade_known_unembeddable_fonts(validation: &mut crate::compliance::types:
             e.code == ErrorCode::FontNotEmbedded
                 && e.location
                     .as_deref()
-                    .is_some_and(|loc| KNOWN_UNEMBEDDABLE_FONTS.iter().any(|n| loc.contains(n)))
+                    .is_some_and(is_known_unembeddable_font)
         });
 
     validation.errors = kept;
     for err in downgraded {
-        validation.warnings.push(ComplianceWarning::new(
+        let mut warning = ComplianceWarning::new(
             WarningCode::KnownUnembeddableFont,
             format!(
                 "{} (downgraded from error per #451 — no open-source equivalent available)",
                 err.message
             ),
-        ));
+        );
+        if let Some(loc) = err.location {
+            warning = warning.with_location(loc);
+        }
+        validation.warnings.push(warning);
     }
 
     if validation.errors.is_empty() {
         validation.is_compliant = true;
     }
+}
+
+/// Exact-match (with subset-prefix tolerance) check that a font's
+/// PostScript name is one of the known-unembeddable Standard14 fonts.
+///
+/// PDF subset fonts use the `ABCDEF+FontName` convention (six tag chars,
+/// plus sign, base name). We accept either the exact base name or a
+/// `+BaseName` suffix; plain substring matching would mis-match
+/// arbitrary fonts like `MySymbolFont` or `ZapfDingbatsITC`.
+fn is_known_unembeddable_font(name: &str) -> bool {
+    KNOWN_UNEMBEDDABLE_FONTS
+        .iter()
+        .any(|&base| name == base || name.split('+').next_back() == Some(base))
 }
 
 #[cfg(test)]
@@ -1736,6 +1753,68 @@ mod tests {
         assert!(v.errors.is_empty());
         assert_eq!(v.warnings.len(), 1);
         assert!(v.is_compliant);
+    }
+
+    #[test]
+    fn downgrade_accepts_subset_prefix() {
+        // PDF subset fonts use the `ABCDEF+FontName` six-tag-char prefix
+        // convention (ISO 32000-1 §9.6.4). The downgrader must match
+        // these as the underlying Standard14 font.
+        use crate::compliance::types::{ComplianceError, ErrorCode, ValidationResult};
+
+        let mut v = ValidationResult::new(PdfALevel::A1b);
+        v.errors.push(
+            ComplianceError::new(ErrorCode::FontNotEmbedded, "font 'ABCDEF+Symbol' not embedded")
+                .with_location("ABCDEF+Symbol"),
+        );
+        v.is_compliant = false;
+
+        downgrade_known_unembeddable_fonts(&mut v);
+        assert!(v.errors.is_empty(), "subset-prefixed Symbol must downgrade");
+        assert_eq!(v.warnings.len(), 1);
+        assert!(v.is_compliant);
+    }
+
+    #[test]
+    fn downgrade_rejects_substring_match() {
+        // Names that merely _contain_ "Symbol" or "ZapfDingbats" as a
+        // substring must NOT match — `MySymbolFont`, `ZapfDingbatsITC`,
+        // etc. are arbitrary fonts unrelated to the unembeddable
+        // Standard14 set.
+        use crate::compliance::types::{ComplianceError, ErrorCode, ValidationResult};
+
+        let mut v = ValidationResult::new(PdfALevel::A1b);
+        v.errors.push(
+            ComplianceError::new(ErrorCode::FontNotEmbedded, "font 'MySymbolFont' not embedded")
+                .with_location("MySymbolFont"),
+        );
+        v.errors.push(
+            ComplianceError::new(ErrorCode::FontNotEmbedded, "font 'ZapfDingbatsITC' not embedded")
+                .with_location("ZapfDingbatsITC"),
+        );
+        v.is_compliant = false;
+
+        downgrade_known_unembeddable_fonts(&mut v);
+        assert_eq!(v.errors.len(), 2, "neither bogus name should be downgraded");
+        assert!(v.warnings.is_empty());
+        assert!(!v.is_compliant);
+    }
+
+    #[test]
+    fn downgrade_propagates_location_to_warning() {
+        // Copilot review #463: dropping `err.location` when downgrading
+        // strips structured context callers may rely on. Propagate it.
+        use crate::compliance::types::{ComplianceError, ErrorCode, ValidationResult};
+
+        let mut v = ValidationResult::new(PdfALevel::A1b);
+        v.errors.push(
+            ComplianceError::new(ErrorCode::FontNotEmbedded, "font 'Symbol' not embedded")
+                .with_location("ABCDEF+Symbol"),
+        );
+
+        downgrade_known_unembeddable_fonts(&mut v);
+        assert_eq!(v.warnings.len(), 1);
+        assert_eq!(v.warnings[0].location.as_deref(), Some("ABCDEF+Symbol"));
     }
 
     #[test]

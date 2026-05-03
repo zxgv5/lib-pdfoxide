@@ -56,9 +56,7 @@ static ACTIVE: OnceLock<Arc<dyn CryptoProvider>> = OnceLock::new();
 /// process startup. Tests that need a fresh provider should run in
 /// separate process namespaces (e.g., `cargo test`'s default
 /// per-test-binary isolation).
-pub fn set_provider(
-    provider: Arc<dyn CryptoProvider>,
-) -> Result<(), SetProviderError> {
+pub fn set_provider(provider: Arc<dyn CryptoProvider>) -> Result<(), SetProviderError> {
     ACTIVE
         .set(provider)
         .map_err(|_| SetProviderError::AlreadySet)
@@ -78,8 +76,8 @@ pub fn is_set() -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::HashAlgorithm;
+    use super::*;
 
     /// `active()` must succeed for a fresh process and return the
     /// permissive default (which permits MD5).

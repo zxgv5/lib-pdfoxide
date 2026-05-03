@@ -46,6 +46,23 @@ impl EncryptionHandler {
             dict.revision
         );
 
+        // FIPS / sovereign-compliance gate. PDF Standard Security
+        // R≤4 (ISO 32000-1 §7.6.3) hard-requires MD5 + RC4 (R=2/3)
+        // or MD5 + AES-128 (R=4) — MD5 is forbidden under FIPS
+        // 140-3 regardless of which symmetric cipher follows. We
+        // reject early so callers get a clear error rather than a
+        // panic deep inside the cipher path. Issue #236.
+        if !crate::crypto::active().is_legacy_allowed() && dict.revision <= 4 {
+            return Err(Error::InvalidPdf(format!(
+                "active CryptoProvider '{}' rejects PDF Standard Security R={} \
+                 (R≤4 requires MD5; FIPS 140-3 forbids MD5). \
+                 Re-encrypt the document at R=6 (AES-256) or build pdf_oxide \
+                 with the default 'crypto-rust' provider.",
+                crate::crypto::active().name(),
+                dict.revision
+            )));
+        }
+
         Ok(Self {
             dict,
             encryption_key: None,

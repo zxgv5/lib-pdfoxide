@@ -53,9 +53,35 @@ impl Rc4Cipher {
     }
 }
 
-/// Encrypt or decrypt data using RC4.
+/// Pure RC4 cipher entry point.
+///
+/// `pub(crate)` — only the [`crate::crypto::RustCryptoProvider`]
+/// implementation calls this directly, to avoid the
+/// `provider.rc4() → rc4_crypt → provider.rc4()` cycle that would
+/// arise if both went through the trait. PDF callers go through
+/// [`rc4_crypt`] (which routes through the active provider so a
+/// FIPS provider can reject it).
+pub(crate) fn rc4_crypt_impl(key: &[u8], data: &[u8]) -> Vec<u8> {
+    let mut cipher = Rc4Cipher::new(key);
+    let mut result = data.to_vec();
+    cipher.apply_keystream(&mut result);
+    result
+}
+
+/// Encrypt or decrypt data using RC4 via the active
+/// [`CryptoProvider`].
 ///
 /// RC4 is symmetric, so encryption and decryption are the same operation.
+///
+/// Required by PDF Standard Security Handler R≤4 (ISO 32000-1
+/// §7.6.3 Algorithm 1). Under the default
+/// [`crate::crypto::RustCryptoProvider`] this succeeds; under the
+/// FIPS-validated `AwsLcProvider` it returns
+/// [`crate::crypto::Error::AlgorithmNotPermitted`] and we panic
+/// with a clear message — callers (currently only
+/// [`super::handler::EncryptionHandler`]) gate on
+/// `crate::crypto::active().is_legacy_allowed()` before reaching
+/// here, so the panic is unreachable in normal flow.
 ///
 /// # Arguments
 ///
@@ -65,11 +91,23 @@ impl Rc4Cipher {
 /// # Returns
 ///
 /// The encrypted/decrypted data
+///
+/// [`CryptoProvider`]: crate::crypto::CryptoProvider
 pub fn rc4_crypt(key: &[u8], data: &[u8]) -> Vec<u8> {
-    let mut cipher = Rc4Cipher::new(key);
-    let mut result = data.to_vec();
-    cipher.apply_keystream(&mut result);
-    result
+    crate::crypto::active()
+        .symmetric()
+        .rc4(key, data)
+        .unwrap_or_else(|_| {
+            // The handler-level FIPS gate (see
+            // `EncryptionHandler::decrypt_*`) prevents reaching this
+            // panic. We deliberately don't fall back to the internal
+            // cipher here — silently bypassing the FIPS rejection
+            // would defeat the point of the active provider.
+            panic!(
+                "RC4 rejected by active CryptoProvider — \
+                 callers must check `is_legacy_allowed()` first"
+            )
+        })
 }
 
 #[cfg(test)]

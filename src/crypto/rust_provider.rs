@@ -60,9 +60,7 @@ impl CryptoProvider for RustCryptoProvider {
                 }
                 #[cfg(not(feature = "signatures"))]
                 {
-                    return Err(Error::Backend(
-                        "SHA-1 requires the 'signatures' cargo feature",
-                    ));
+                    return Err(Error::Backend("SHA-1 requires the 'signatures' cargo feature"));
                 }
             },
             HashAlgorithm::Sha256 => Box::new(Sha256Hasher::new()),
@@ -90,9 +88,7 @@ impl CryptoProvider for RustCryptoProvider {
         }
         #[cfg(not(feature = "signatures"))]
         {
-            Err(Error::Backend(
-                "signing requires the 'signatures' cargo feature",
-            ))
+            Err(Error::Backend("signing requires the 'signatures' cargo feature"))
         }
     }
 }
@@ -201,10 +197,18 @@ impl SymmetricCipher for RustSymmetric {
             ));
         }
         match (key_size, padding) {
-            (AesKeySize::Aes128, Padding::Pkcs7) => aes_cbc_encrypt_pkcs7::<aes::Aes128>(key, iv, data),
-            (AesKeySize::Aes128, Padding::None) => aes_cbc_encrypt_no_pad::<aes::Aes128>(key, iv, data),
-            (AesKeySize::Aes256, Padding::Pkcs7) => aes_cbc_encrypt_pkcs7::<aes::Aes256>(key, iv, data),
-            (AesKeySize::Aes256, Padding::None) => aes_cbc_encrypt_no_pad::<aes::Aes256>(key, iv, data),
+            (AesKeySize::Aes128, Padding::Pkcs7) => {
+                aes_cbc_encrypt_pkcs7::<aes::Aes128>(key, iv, data)
+            },
+            (AesKeySize::Aes128, Padding::None) => {
+                aes_cbc_encrypt_no_pad::<aes::Aes128>(key, iv, data)
+            },
+            (AesKeySize::Aes256, Padding::Pkcs7) => {
+                aes_cbc_encrypt_pkcs7::<aes::Aes256>(key, iv, data)
+            },
+            (AesKeySize::Aes256, Padding::None) => {
+                aes_cbc_encrypt_no_pad::<aes::Aes256>(key, iv, data)
+            },
         }
     }
 
@@ -218,15 +222,21 @@ impl SymmetricCipher for RustSymmetric {
     ) -> Result<Vec<u8>> {
         check_key_iv(key_size, key, iv)?;
         if !data.len().is_multiple_of(16) {
-            return Err(Error::InvalidInput(
-                "AES-CBC ciphertext must be a 16-byte multiple",
-            ));
+            return Err(Error::InvalidInput("AES-CBC ciphertext must be a 16-byte multiple"));
         }
         match (key_size, padding) {
-            (AesKeySize::Aes128, Padding::Pkcs7) => aes_cbc_decrypt_pkcs7::<aes::Aes128>(key, iv, data),
-            (AesKeySize::Aes128, Padding::None) => aes_cbc_decrypt_no_pad::<aes::Aes128>(key, iv, data),
-            (AesKeySize::Aes256, Padding::Pkcs7) => aes_cbc_decrypt_pkcs7::<aes::Aes256>(key, iv, data),
-            (AesKeySize::Aes256, Padding::None) => aes_cbc_decrypt_no_pad::<aes::Aes256>(key, iv, data),
+            (AesKeySize::Aes128, Padding::Pkcs7) => {
+                aes_cbc_decrypt_pkcs7::<aes::Aes128>(key, iv, data)
+            },
+            (AesKeySize::Aes128, Padding::None) => {
+                aes_cbc_decrypt_no_pad::<aes::Aes128>(key, iv, data)
+            },
+            (AesKeySize::Aes256, Padding::Pkcs7) => {
+                aes_cbc_decrypt_pkcs7::<aes::Aes256>(key, iv, data)
+            },
+            (AesKeySize::Aes256, Padding::None) => {
+                aes_cbc_decrypt_no_pad::<aes::Aes256>(key, iv, data)
+            },
         }
     }
 
@@ -234,8 +244,10 @@ impl SymmetricCipher for RustSymmetric {
         if key.is_empty() || key.len() > 256 {
             return Err(Error::InvalidInput("RC4 key must be 1..=256 bytes"));
         }
-        // Re-use the in-tree RC4 implementation so the migration is byte-equal.
-        Ok(crate::encryption::rc4::rc4_crypt(key, data))
+        // Calls the in-tree pure cipher impl directly (not the
+        // `pub fn rc4_crypt` wrapper, which itself routes through us
+        // — that would loop). Byte-equal to pre-Phase-3 output.
+        Ok(crate::encryption::rc4::rc4_crypt_impl(key, data))
     }
 }
 
@@ -367,17 +379,16 @@ impl SignatureVerifier for RustVerifier {
             },
         };
 
-        let prefix = digest_info_prefix(oid).ok_or(Error::Backend(
-            "no DigestInfo prefix table entry for selected hash",
-        ))?;
+        let prefix = digest_info_prefix(oid)
+            .ok_or(Error::Backend("no DigestInfo prefix table entry for selected hash"))?;
         let mut digest_info = Vec::with_capacity(prefix.len() + digest.len());
         digest_info.extend_from_slice(prefix);
         digest_info.extend_from_slice(digest);
 
         let n = rsa::BigUint::from_bytes_be(pubkey.modulus_be);
         let e = rsa::BigUint::from_bytes_be(pubkey.exponent_be);
-        let key = RcRsa::new(n, e)
-            .map_err(|_| Error::InvalidInput("invalid RSA modulus/exponent"))?;
+        let key =
+            RcRsa::new(n, e).map_err(|_| Error::InvalidInput("invalid RSA modulus/exponent"))?;
         key.verify(Pkcs1v15Sign::new_unprefixed(), &digest_info, signature)
             .map_err(|_| Error::Verification("RSA-PKCS#1-v1.5 signature did not verify"))
     }
@@ -395,8 +406,8 @@ impl SignatureVerifier for RustVerifier {
 
         let n = rsa::BigUint::from_bytes_be(pubkey.modulus_be);
         let e = rsa::BigUint::from_bytes_be(pubkey.exponent_be);
-        let key = RcRsa::new(n, e)
-            .map_err(|_| Error::InvalidInput("invalid RSA modulus/exponent"))?;
+        let key =
+            RcRsa::new(n, e).map_err(|_| Error::InvalidInput("invalid RSA modulus/exponent"))?;
         let sig = PssSignature::try_from(signature)
             .map_err(|_| Error::InvalidInput("malformed RSA-PSS signature bytes"))?;
         let ok = match hash {
@@ -465,9 +476,7 @@ impl SignatureVerifier for RustVerifier {
         _digest: &[u8],
         _signature: &[u8],
     ) -> Result<()> {
-        Err(Error::Backend(
-            "RSA verification requires the 'signatures' cargo feature",
-        ))
+        Err(Error::Backend("RSA verification requires the 'signatures' cargo feature"))
     }
     fn verify_rsa_pss(
         &self,
@@ -476,9 +485,7 @@ impl SignatureVerifier for RustVerifier {
         _message: &[u8],
         _signature: &[u8],
     ) -> Result<()> {
-        Err(Error::Backend(
-            "RSA-PSS verification requires the 'signatures' cargo feature",
-        ))
+        Err(Error::Backend("RSA-PSS verification requires the 'signatures' cargo feature"))
     }
     fn verify_ecdsa(
         &self,
@@ -487,9 +494,7 @@ impl SignatureVerifier for RustVerifier {
         _digest: &[u8],
         _signature_der: &[u8],
     ) -> Result<()> {
-        Err(Error::Backend(
-            "ECDSA verification requires the 'signatures' cargo feature",
-        ))
+        Err(Error::Backend("ECDSA verification requires the 'signatures' cargo feature"))
     }
 }
 
@@ -524,7 +529,11 @@ mod signing {
                     ));
                 },
             },
-            SigningKeyMaterial::Pkcs1Der { scheme, hash, bytes } => {
+            SigningKeyMaterial::Pkcs1Der {
+                scheme,
+                hash,
+                bytes,
+            } => {
                 use rsa::pkcs1::DecodeRsaPrivateKey;
                 let pk = RsaPrivateKey::from_pkcs1_der(bytes)
                     .map_err(|_| Error::InvalidInput("invalid PKCS#1 RSA private key"))?;
@@ -542,7 +551,10 @@ mod signing {
             ));
         }
 
-        Ok(Box::new(RsaSigner { key: priv_key, algo }))
+        Ok(Box::new(RsaSigner {
+            key: priv_key,
+            algo,
+        }))
     }
 
     struct RsaSigner {
@@ -702,9 +714,13 @@ mod tests {
         let p = provider();
         let key = [0u8; 16];
         let iv = [0u8; 16];
-        let result =
-            p.symmetric()
-                .aes_cbc_encrypt(AesKeySize::Aes128, &key, &iv, b"15 bytes only..", Padding::None);
+        let result = p.symmetric().aes_cbc_encrypt(
+            AesKeySize::Aes128,
+            &key,
+            &iv,
+            b"15 bytes only..",
+            Padding::None,
+        );
         assert!(matches!(result, Err(Error::InvalidInput(_))));
     }
 

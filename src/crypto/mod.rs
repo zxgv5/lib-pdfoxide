@@ -25,7 +25,9 @@ mod types;
 
 pub use active::{active, is_set, set_provider, SetProviderError};
 pub use error::{not_permitted, AlgorithmKind, Error, Result};
-pub use provider::{CryptoProvider, Hasher, SignatureVerifier, Signer, SigningKeyMaterial, SymmetricCipher};
+pub use provider::{
+    CryptoProvider, Hasher, SignatureVerifier, Signer, SigningKeyMaterial, SymmetricCipher,
+};
 pub use rust_provider::RustCryptoProvider;
 pub use types::{
     AesKeySize, AsymmetricAlgorithm, EcCurve, HashAlgorithm, Padding, RsaPublicKey, RsaScheme,

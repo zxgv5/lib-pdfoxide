@@ -382,6 +382,103 @@ impl PyPdfDocument {
         }
     }
 
+    /// Render a page to fit inside a target pixel bounding box, preserving
+    /// aspect ratio. Picks the largest DPI such that both rendered
+    /// dimensions are ≤ the target box. Useful for thumbnails / fixed-size
+    /// previews where the caller doesn't want to do DPI arithmetic.
+    ///
+    /// Args:
+    ///     page (int):   Zero-based page index.
+    ///     width (int):  Target box width in pixels (must be > 0).
+    ///     height (int): Target box height in pixels (must be > 0).
+    ///     format (str, optional): "png" (default) or "jpeg".
+    ///     background (tuple[float, float, float, float], optional):
+    ///         RGBA in 0..1. Default white.
+    ///     transparent (bool, optional): If True, no background fill.
+    ///     render_annotations (bool, optional): default True.
+    ///     jpeg_quality (int, optional): 1-100, default 85.
+    ///
+    /// Returns: bytes of the rendered image. Issue #441 / #448.
+    #[pyo3(signature = (
+        page, width, height, *,
+        format=None, background=None, transparent=false,
+        render_annotations=None, jpeg_quality=None,
+    ))]
+    #[allow(clippy::too_many_arguments)]
+    fn render_page_fit(
+        &mut self,
+        page: usize,
+        width: u32,
+        height: u32,
+        format: Option<&str>,
+        background: Option<(f32, f32, f32, f32)>,
+        transparent: bool,
+        render_annotations: Option<bool>,
+        jpeg_quality: Option<u8>,
+    ) -> PyResult<Vec<u8>> {
+        #[cfg(feature = "rendering")]
+        {
+            use pyo3::exceptions::PyValueError;
+
+            if width == 0 || height == 0 {
+                return Err(PyValueError::new_err("width and height must be > 0"));
+            }
+            let quality = match jpeg_quality {
+                Some(q) => {
+                    if !(1..=100).contains(&q) {
+                        return Err(PyValueError::new_err(format!(
+                            "jpeg_quality must be 1-100, got {q}",
+                        )));
+                    }
+                    q
+                },
+                None => 85,
+            };
+
+            let mut options = crate::rendering::RenderOptions::default();
+            if let Some(fmt) = format {
+                match fmt.to_lowercase().as_str() {
+                    "jpeg" | "jpg" => {
+                        options = options.as_jpeg(quality);
+                    },
+                    "png" => { /* default */ },
+                    _ => {
+                        return Err(PyValueError::new_err(format!(
+                            "format must be 'png' or 'jpeg', got {fmt:?}",
+                        )))
+                    },
+                }
+            }
+            if let Some((r, g, b, a)) = background {
+                options.background = Some([r, g, b, a]);
+            }
+            if transparent {
+                options.background = None;
+            }
+            if let Some(flag) = render_annotations {
+                options.render_annotations = flag;
+            }
+
+            crate::rendering::render_page_fit(&mut self.inner, page, width, height, &options)
+                .map(|img| img.data)
+                .map_err(|e| PyRuntimeError::new_err(format!("Failed to render page: {e}")))
+        }
+        #[cfg(not(feature = "rendering"))]
+        {
+            let _ = (
+                page,
+                width,
+                height,
+                format,
+                background,
+                transparent,
+                render_annotations,
+                jpeg_quality,
+            );
+            Err(PyRuntimeError::new_err("Rendering feature not enabled."))
+        }
+    }
+
     /// Extract low-level characters.
     #[pyo3(signature = (page, region=None))]
     fn extract_chars(

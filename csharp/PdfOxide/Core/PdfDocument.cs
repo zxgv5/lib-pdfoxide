@@ -1145,7 +1145,7 @@ namespace PdfOxide.Core
         /// <summary>
         /// Whether the FIPS-validated <c>aws-lc-rs</c> provider was
         /// compiled into the native library. Build the native lib
-        /// with <c>--features crypto-aws-lc</c> to enable.
+        /// with <c>--features fips</c> to enable.
         /// </summary>
         public static bool IsFipsCryptoAvailable()
         {
@@ -1170,7 +1170,7 @@ namespace PdfOxide.Core
                 case 1:
                     throw new InvalidOperationException(
                         "FIPS provider not compiled into pdf_oxide native lib; " +
-                        "rebuild with `cargo build --features crypto-aws-lc`.");
+                        "rebuild with `cargo build --features fips`.");
                 case 2:
                     throw new InvalidOperationException(
                         "Cryptographic provider already installed — " +

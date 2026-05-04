@@ -3956,9 +3956,8 @@ func GetLogLevel() LogLevel {
 // ================================================================
 
 // ErrFipsNotCompiled is returned by UseFipsCryptoProvider when the
-// native pdf_oxide library was built without the crypto-aws-lc
-// feature.
-var ErrFipsNotCompiled = errors.New("FIPS provider not compiled in; rebuild native lib with --features crypto-aws-lc")
+// native pdf_oxide library was built without the fips feature.
+var ErrFipsNotCompiled = errors.New("FIPS provider not compiled in; rebuild native lib with --features fips")
 
 // ErrCryptoProviderAlreadySet is returned by UseFipsCryptoProvider
 // when a cryptographic provider has already been installed for the
@@ -3981,7 +3980,7 @@ func ActiveCryptoProvider() string {
 
 // IsFipsCryptoAvailable reports whether the FIPS-validated aws-lc-rs
 // provider was compiled into the native library. Build the lib with
-// --features crypto-aws-lc to enable.
+// --features fips to enable.
 func IsFipsCryptoAvailable() bool {
 	return C.pdf_oxide_crypto_fips_available() != 0
 }

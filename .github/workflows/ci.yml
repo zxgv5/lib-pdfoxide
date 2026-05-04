@@ -152,7 +152,7 @@ jobs:
         if: matrix.features == ''
 
   # FIPS-validated CryptoProvider build + test gate (issue #236).
-  # Confirms `--features crypto-aws-lc` compiles, that AwsLcProvider's
+  # Confirms `--features fips` compiles, that AwsLcProvider's
   # 11-test policy/round-trip suite passes, and that the cross-provider
   # AES byte-equality assertion catches API drift between
   # `aws-lc-rs` and the default RustCrypto stack.
@@ -174,17 +174,17 @@ jobs:
         with:
           key: fips
 
-      - name: Build with crypto-aws-lc
-        run: cargo build --features python,crypto-aws-lc
+      - name: Build with fips feature
+        run: cargo build --features python,fips
 
       - name: Run AwsLcProvider tests + cross-provider AES compat
-        run: cargo test --features python,crypto-aws-lc --lib crypto::aws_lc_provider
+        run: cargo test --features python,fips --lib crypto::aws_lc_provider
 
       - name: Run full lib test suite under FIPS feature
-        run: cargo test --features python,crypto-aws-lc --lib
+        run: cargo test --features python,fips --lib
 
       - name: Clippy under FIPS feature
-        run: cargo clippy --features python,crypto-aws-lc --lib --tests -- -D warnings
+        run: cargo clippy --features python,fips --lib --tests -- -D warnings
 
   # Rust examples smoke-test
   rust-examples:

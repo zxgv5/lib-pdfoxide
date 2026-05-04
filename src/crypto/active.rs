@@ -53,7 +53,7 @@ static ACTIVE: OnceLock<Arc<dyn CryptoProvider>> = OnceLock::new();
 /// installed.
 ///
 /// FIPS deployments call this once with `AwsLcProvider` (behind the
-/// `crypto-aws-lc` feature) at process startup.
+/// `fips` feature) at process startup.
 ///
 /// Tests that need a fresh provider registry must run in their own
 /// process — `cargo test` reuses one binary per crate target, so

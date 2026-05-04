@@ -68,7 +68,7 @@ allow = [
     # transitively via `aws-lc-rs/fips` → `aws-lc-fips-sys` (the
     # FIPS-validated module is a fork of OpenSSL FIPS Object Module
     # with additional Amazon validation). Only enters the dep graph
-    # under the opt-in `crypto-aws-lc` feature; the default
+    # under the opt-in `fips` feature; the default
     # RustCrypto provider does not pull it.
     "OpenSSL",
 ]

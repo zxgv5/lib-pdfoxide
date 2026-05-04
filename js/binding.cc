@@ -2085,7 +2085,7 @@ Napi::Value GetLogLevel(const Napi::CallbackInfo& info) {
 }
 
 // Crypto provider (issue #236) — runtime opt-in to FIPS-validated
-// `aws-lc-rs` backend. Build the addon with --features crypto-aws-lc
+// `aws-lc-rs` backend. Build the addon with --features fips
 // for the FIPS path to be available; otherwise UseFipsProvider
 // throws.
 Napi::Value GetActiveCryptoProvider(const Napi::CallbackInfo& info) {
@@ -2111,7 +2111,7 @@ Napi::Value UseFipsCryptoProvider(const Napi::CallbackInfo& info) {
   if (code == 1) {
     throw Napi::Error::New(
         env,
-        "FIPS provider not compiled in; rebuild addon with --features crypto-aws-lc");
+        "FIPS provider not compiled in; rebuild addon with --features fips");
   }
   if (code == 2) {
     throw Napi::Error::New(env, "crypto provider already set");

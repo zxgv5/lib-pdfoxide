@@ -1,6 +1,6 @@
 //! FIPS 140-3 validated [`CryptoProvider`] backed by `aws-lc-rs`.
 //!
-//! Built behind the `crypto-aws-lc` cargo feature (off by default).
+//! Built behind the `fips` cargo feature (off by default).
 //! When enabled and installed at runtime via [`super::set_provider`],
 //! every PDF crypto operation routes to AWS-LC's FIPS-validated
 //! module. Algorithms outside the NIST 140-3 approved set
@@ -29,7 +29,7 @@
 //!
 //! Issue #236.
 
-#![cfg(feature = "crypto-aws-lc")]
+#![cfg(feature = "fips")]
 
 use aws_lc_rs::cipher::{
     DecryptingKey, EncryptingKey, EncryptionContext, PaddedBlockDecryptingKey,

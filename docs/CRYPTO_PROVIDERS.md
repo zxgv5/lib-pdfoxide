@@ -19,7 +19,7 @@ Tracking issue: [#236](https://github.com/yfedoseev/pdf_oxide/issues/236).
 | Need | Provider | How |
 |---|---|---|
 | General-purpose use | `RustCryptoProvider` | nothing — it's the default |
-| FIPS 140-3 compliance | `AwsLcProvider` | build with `--features crypto-aws-lc` and call `crypto::set_provider(...)` at startup |
+| FIPS 140-3 compliance | `AwsLcProvider` | build with `--features fips` and call `crypto::set_provider(...)` at startup |
 | Hardware-rooted keys (HSM, PKCS#11, Cloud KMS) | custom | implement `CryptoProvider` for your backend, call `crypto::set_provider(Arc::new(YourProvider))` |
 | Sovereign-jurisdiction algorithms (GOST, SM2/3/4) | custom | same — implement `CryptoProvider` against your country's crypto library |
 
@@ -42,9 +42,9 @@ fn main() {
 Build:
 
 ```bash
-cargo build --features crypto-aws-lc
+cargo build --features fips
 # Or, with python bindings:
-cargo build --features python,crypto-aws-lc
+cargo build --features python,fips
 ```
 
 The `aws-lc-rs` dependency compiles AWS-LC C source; first build
@@ -80,7 +80,7 @@ opening one of these documents under `AwsLcProvider` fails with:
 active CryptoProvider 'aws-lc-rs' rejects PDF Standard Security R=4
 (R≤4 requires MD5; FIPS 140-3 forbids MD5).
 Re-encrypt the document at R=6 (AES-256) or build pdf_oxide
-without the 'crypto-aws-lc' feature so the default 'rust-crypto'
+without the 'fips' feature so the default 'rust-crypto'
 provider stays active.
 ```
 

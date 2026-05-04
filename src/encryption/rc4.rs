@@ -81,7 +81,7 @@ pub(crate) fn rc4_crypt_impl(key: &[u8], data: &[u8]) -> Vec<u8> {
 /// `crypto::Error` cause so debugging stays actionable for *all*
 /// failure modes — wrong key length (`InvalidInput`), backend failure
 /// (`Backend`), and the FIPS-policy `AlgorithmNotPermitted`. Only the
-/// last one carries the "rebuild without crypto-aws-lc" remediation
+/// last one carries the "rebuild without fips" remediation
 /// hint.
 ///
 /// [`CryptoProvider`]: crate::crypto::CryptoProvider
@@ -95,7 +95,7 @@ pub fn rc4_crypt(key: &[u8], data: &[u8]) -> crate::Result<Vec<u8>> {
                     "RC4 rejected by active CryptoProvider '{}': {}. \
                      RC4 is required for PDF Standard Security R≤4. \
                      Re-encrypt at R=6 (AES-256) or build pdf_oxide \
-                     without the 'crypto-aws-lc' feature so the default \
+                     without the 'fips' feature so the default \
                      'rust-crypto' provider stays active.",
                     crate::crypto::active().name(),
                     e

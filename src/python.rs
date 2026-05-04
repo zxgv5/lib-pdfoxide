@@ -7207,11 +7207,11 @@ fn crypto_active_provider() -> String {
 ///
 /// Always contains ``"rust-crypto"`` (the default permissive
 /// provider). Also contains ``"aws-lc-rs"`` when the wheel was built
-/// with ``--features crypto-aws-lc`` — the FIPS 140-3 validated path.
+/// with ``--features fips`` — the FIPS 140-3 validated path.
 #[pyo3::pyfunction]
 fn crypto_available_providers() -> Vec<String> {
     let v = vec!["rust-crypto".to_string()];
-    #[cfg(feature = "crypto-aws-lc")]
+    #[cfg(feature = "fips")]
     let v = {
         let mut v = v;
         v.push("aws-lc-rs".to_string());
@@ -7231,19 +7231,19 @@ fn crypto_available_providers() -> Vec<String> {
 /// contract — match on the exception type, not its text).
 ///
 /// Raises ``RuntimeError("FIPS feature not compiled in")`` when the
-/// wheel was built without ``--features crypto-aws-lc``.
+/// wheel was built without ``--features fips``.
 #[pyo3::pyfunction]
 fn crypto_use_fips() -> pyo3::PyResult<()> {
-    #[cfg(feature = "crypto-aws-lc")]
+    #[cfg(feature = "fips")]
     {
         use std::sync::Arc;
         crate::crypto::set_provider(Arc::new(crate::crypto::AwsLcProvider::new()))
             .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))
     }
-    #[cfg(not(feature = "crypto-aws-lc"))]
+    #[cfg(not(feature = "fips"))]
     {
         Err(pyo3::exceptions::PyRuntimeError::new_err(
-            "FIPS provider not compiled in; build wheel with --features crypto-aws-lc",
+            "FIPS provider not compiled in; build wheel with --features fips",
         ))
     }
 }

@@ -2,7 +2,7 @@ name: Release (FIPS variant)
 
 # FIPS-validated build & publish path (issue #236).
 #
-# Manually triggered. Builds `pdf_oxide` with --features crypto-aws-lc
+# Manually triggered. Builds `pdf_oxide` with --features fips
 # (AWS-LC FIPS 140-3 module) and publishes the resulting artifacts as
 # parallel `_fips` distributions on every ecosystem's package index:
 #
@@ -127,7 +127,7 @@ jobs:
           uv tool install maturin
           maturin build --release \
             --target ${{ matrix.target }} \
-            --features python,crypto-aws-lc \
+            --features python,fips \
             --out dist
 
       - name: Smoke-test wheel
@@ -242,7 +242,7 @@ jobs:
           targets: ${{ matrix.target }}
 
       - name: Build cdylib with FIPS feature
-        run: cargo build --release --target ${{ matrix.target }} --features crypto-aws-lc
+        run: cargo build --release --target ${{ matrix.target }} --features fips
 
       - name: Stage prebuild
         shell: bash
@@ -417,7 +417,7 @@ jobs:
           targets: ${{ matrix.target }}
 
       - name: Build cdylib with FIPS feature
-        run: cargo build --release --target ${{ matrix.target }} --features crypto-aws-lc
+        run: cargo build --release --target ${{ matrix.target }} --features fips
 
       - name: Stage RID-specific lib
         shell: bash
@@ -567,7 +567,7 @@ jobs:
           targets: ${{ matrix.target }}
 
       - name: Build static lib with FIPS feature
-        run: cargo build --release --target ${{ matrix.target }} --features crypto-aws-lc
+        run: cargo build --release --target ${{ matrix.target }} --features fips
 
       - name: Stage go-fips lib
         shell: bash

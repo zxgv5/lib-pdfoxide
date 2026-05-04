@@ -287,13 +287,13 @@ pub extern "C" fn pdf_oxide_crypto_active_provider() -> *mut c_char {
 
 /// Whether the FIPS-validated `aws-lc-rs` provider was compiled
 /// into this binary. Returns 1 if available (built with
-/// `--features crypto-aws-lc`), 0 otherwise.
+/// `--features fips`), 0 otherwise.
 ///
 /// Bindings query this to expose the right list to user code (Python
 /// `available_providers()`, etc.).
 #[no_mangle]
 pub extern "C" fn pdf_oxide_crypto_fips_available() -> i32 {
-    if cfg!(feature = "crypto-aws-lc") {
+    if cfg!(feature = "fips") {
         1
     } else {
         0
@@ -311,7 +311,7 @@ pub extern "C" fn pdf_oxide_crypto_fips_available() -> i32 {
 ///   2 = provider already set
 #[no_mangle]
 pub extern "C" fn pdf_oxide_crypto_use_fips() -> i32 {
-    #[cfg(feature = "crypto-aws-lc")]
+    #[cfg(feature = "fips")]
     {
         use std::sync::Arc;
         match crate::crypto::set_provider(Arc::new(crate::crypto::AwsLcProvider::new())) {
@@ -319,7 +319,7 @@ pub extern "C" fn pdf_oxide_crypto_use_fips() -> i32 {
             Err(_) => 2,
         }
     }
-    #[cfg(not(feature = "crypto-aws-lc"))]
+    #[cfg(not(feature = "fips"))]
     {
         1
     }

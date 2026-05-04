@@ -465,7 +465,7 @@ impl EncryptDictBuilder {
                 "active CryptoProvider '{}' rejects PDF Standard Security R={} \
                  (R≤4 requires MD5 + RC4; FIPS 140-3 forbids both). \
                  Use Algorithm::Aes256 (R=6) or build pdf_oxide \
-                 without the 'crypto-aws-lc' feature.",
+                 without the 'fips' feature.",
                 crate::crypto::active().name(),
                 revision
             )));

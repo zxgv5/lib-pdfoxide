@@ -7,7 +7,7 @@
 //!   `md-5`, `aes`, `rsa`, `p256`, `p384`, `getrandom`. Permits all
 //!   PDF-spec-required algorithms including the legacy MD5+RC4 path
 //!   needed for ISO 32000-1 R≤4 documents.
-//! - **`AwsLcProvider`** (Phase 6, behind `--features crypto-aws-lc`)
+//! - **`AwsLcProvider`** (Phase 6, behind `--features fips`)
 //!   — built on `aws-lc-rs` with the `fips` feature. FIPS 140-3
 //!   validated since 2024. Refuses MD5, RC4, and SHA-1-for-signing.
 //!
@@ -18,7 +18,7 @@
 //! Tracking issue: <https://github.com/yfedoseev/pdf_oxide/issues/236>.
 
 mod active;
-#[cfg(feature = "crypto-aws-lc")]
+#[cfg(feature = "fips")]
 mod aws_lc_provider;
 mod error;
 mod provider;
@@ -26,7 +26,7 @@ mod rust_provider;
 mod types;
 
 pub use active::{active, is_set, set_provider, SetProviderError};
-#[cfg(feature = "crypto-aws-lc")]
+#[cfg(feature = "fips")]
 pub use aws_lc_provider::AwsLcProvider;
 pub use error::{not_permitted, AlgorithmKind, Error, Result};
 pub use provider::{

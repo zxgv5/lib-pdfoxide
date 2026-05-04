@@ -183,7 +183,7 @@ pub trait Signer: Send {
 ///   uses `sha2`/`sha1`/`md-5`/`aes`/`rsa`/`p256`/`p384`. Permits
 ///   legacy.
 /// - `super::aws_lc_provider::AwsLcProvider` (Phase 6, behind
-///   `--features crypto-aws-lc`) — FIPS 140-3 validated. Refuses
+///   `--features fips`) — FIPS 140-3 validated. Refuses
 ///   legacy.
 pub trait CryptoProvider: Send + Sync + 'static {
     /// Human-readable provider name for logs / SBOM annotations.

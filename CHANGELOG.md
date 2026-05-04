@@ -16,7 +16,7 @@ All notable changes to PDFOxide are documented here.
     (`sha2`, `aes`, `rsa`, `p256`, `p384`, `getrandom`, `md-5`,
     `sha1`). Permits every algorithm PDF specs reference, including
     the legacy MD5+RC4 path required by ISO 32000-1 R≤4 documents.
-  - **`AwsLcProvider`** (opt-in via `--features crypto-aws-lc`):
+  - **`AwsLcProvider`** (opt-in via `--features fips`):
     backed by `aws-lc-rs`, FIPS 140-3 validated since 2024. Refuses
     MD5 / SHA-1-for-signing / RC4 with `Error::AlgorithmNotPermitted`
     and a clear remediation message.
@@ -45,7 +45,7 @@ The `is_legacy_allowed()` policy bit lets each provider declare
 whether MD5 / SHA-1-sign / RC4 are permitted. PDF Standard Security
 R≤4 documents are gated at `EncryptionHandler::new`: under a FIPS
 provider they fail with a remediation message ("re-encrypt at R=6
-or build pdf_oxide without the 'crypto-aws-lc' feature so the default
+or build pdf_oxide without the 'fips' feature so the default
 'rust-crypto' provider stays active") rather than panic
 deep inside the cipher path.
 
@@ -66,7 +66,7 @@ HSMs), and the legacy-PDF policy table.
 ### CI
 
 - New `fips` job in `.github/workflows/ci.yml` builds with
-  `--features crypto-aws-lc`, runs the 11-test AwsLcProvider suite
+  `--features fips`, runs the 11-test AwsLcProvider suite
   including a `cross_provider_aes_compat` check that asserts the
   FIPS and rust-crypto AES paths produce byte-identical output, and
   enforces clippy `-D warnings` under the FIPS feature.
@@ -76,7 +76,7 @@ HSMs), and the legacy-PDF policy table.
 - New `.github/workflows/release-fips.yml` workflow (manually
   triggered) builds and publishes parallel FIPS distributions on
   every package index, all from the same Rust source compiled with
-  `--features crypto-aws-lc` so each binary contains only AWS-LC's
+  `--features fips` so each binary contains only AWS-LC's
   FIPS-validated module:
 
   | Ecosystem | Package | Install |
@@ -128,7 +128,7 @@ HSMs), and the legacy-PDF policy table.
 
 ### Tests
 
-- 5050 lib tests pass under `--features python,crypto-aws-lc`
+- 5050 lib tests pass under `--features python,fips`
   (5039 default + 11 FIPS-only).
 - 119 encryption tests still pass byte-equal post-rewire to the
   trait.

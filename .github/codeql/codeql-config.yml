@@ -21,10 +21,6 @@ paths-ignore:
 #    the FIPS provider via Error::AlgorithmNotPermitted.
 query-filters:
   - exclude:
-      id: rust/hardcoded-cryptographic-value
-  - exclude:
-      id: rust/hardcoded-key
+      id: rust/hard-coded-cryptographic-value
   - exclude:
       id: rust/weak-cryptographic-algorithm
-  - exclude:
-      id: rust/insecure-randomness

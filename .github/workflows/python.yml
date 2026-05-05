@@ -292,9 +292,13 @@ jobs:
           - distro: amazonlinux-2023
             image: amazonlinux:2023
             artifact: wheels-linux-x86_64-manylinux_2_28
-          - distro: ubuntu-20.04
-            image: ubuntu:20.04
-            artifact: wheels-linux-x86_64-manylinux_2_28
+          # ubuntu-20.04 (focal) dropped 2026-05-05: standard LTS support
+          # ended 2025-04-30 and Canonical's archive.ubuntu.com /
+          # security.ubuntu.com mirrors for focal stopped serving (port 80
+          # connection timeouts), while old-releases.ubuntu.com hasn't
+          # received focal yet (ESM at esm.ubuntu.com is paywalled).
+          # `apt-get update` fails before pip even runs. debian-11 below
+          # covers the same glibc 2.31 floor.
           - distro: debian-11
             image: debian:11-slim
             artifact: wheels-linux-x86_64-manylinux_2_28

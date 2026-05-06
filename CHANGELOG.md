@@ -262,6 +262,22 @@ speedup (12–54×) holds regardless.
   `test_select_pages_in_place`, and
   `test_select_pages_out_of_range`.
 
+### Known follow-ups (v0.3.45)
+
+- **`AwsLcProvider` RSA-PKCS#1 v1.5 verify-from-digest
+  ([#475](https://github.com/yfedoseev/pdf_oxide/issues/475))** —
+  `AwsLcProvider::verify_rsa_pkcs1v15` is currently a stub; PDF/CMS
+  signatures using RSA-PKCS#1 v1.5 return `SignerVerify::Unknown`
+  instead of verifying under FIPS. Blocked on
+  `aws-lc-rs` exposing a stable `RSA_PKCS1_PRIM_VERIFY` API.
+  `RustCryptoProvider` (default) is not affected.
+- **`AwsLcProvider` signing wiring** — signing calls are currently
+  routed to `RustCryptoProvider`. Full AWS-LC signing integration
+  lands in v0.3.45.
+- **musllinux Python wheels for the FIPS variant** — FIPS musllinux
+  wheels (Alpine / musl libc) require a musl-targeted
+  `aws-lc-fips-sys` build; work in progress.
+
 ## [0.3.43] - 2026-05-03
 
 > Cross-binding parity, WASI build target, and a basket of issue fixes.

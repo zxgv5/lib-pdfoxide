@@ -2183,6 +2183,45 @@ impl PyPdfDocument {
         Ok(PyBytes::new(py, &bytes))
     }
 
+    /// Extract several non-overlapping page ranges in one call. Each range is
+    /// `(start, end)` interpreted as `[start, end)`. Returns a list of `bytes`
+    /// objects, one per range, in the same order.
+    ///
+    /// Example::
+    ///
+    ///     doc = PdfDocument.from_bytes(pdf_bytes)
+    ///     n = doc.page_count()
+    ///     ranges = [(i, min(i + 3000, n)) for i in range(0, n, 3000)]
+    ///     chunks = doc.extract_page_ranges_to_bytes(ranges)
+    fn extract_page_ranges_to_bytes<'py>(
+        &mut self,
+        py: Python<'py>,
+        ranges: Vec<(usize, usize)>,
+    ) -> PyResult<Vec<Bound<'py, PyBytes>>> {
+        self.ensure_editor()?;
+        let editor = self.editor.as_mut().ok_or_else(|| {
+            PyRuntimeError::new_err("Internal error: editor missing after initialization")
+        })?;
+        let chunks = editor
+            .extract_page_ranges_to_bytes(&ranges)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        Ok(chunks.into_iter().map(|b| PyBytes::new(py, &b)).collect())
+    }
+
+    /// Restrict this document to the listed pages, in the order given.
+    /// Equivalent to PyMuPDF's `doc.select(page_list)`.
+    /// Subsequent `save_to_bytes()` / `save()` produces a PDF containing only
+    /// the selected pages, with garbage-collected resources.
+    fn select_pages(&mut self, pages: Vec<usize>) -> PyResult<()> {
+        self.ensure_editor()?;
+        let editor = self.editor.as_mut().ok_or_else(|| {
+            PyRuntimeError::new_err("Internal error: editor missing after initialization")
+        })?;
+        editor
+            .select_pages(&pages)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+    }
+
     /// Delete a page by index (0-based).
     fn delete_page(&mut self, index: usize) -> PyResult<()> {
         use crate::editor::EditableDocument;

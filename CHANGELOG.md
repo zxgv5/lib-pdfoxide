@@ -144,6 +144,106 @@ HSMs), and the legacy-PDF policy table.
   for either Linux target — preventing this regression from recurring.
   The 0.3.21 baseline (originally added in #284) is restored.
 
+### Performance — `extract_pages_to_bytes` 12–54× faster
+
+Extraction of page ranges from large PDFs is now bound by
+serialisation work instead of redundant document rebuilds and tree
+walks. Closes [#474](https://github.com/yfedoseev/pdf_oxide/issues/474),
+reported by community contributor
+[@potatochipcoconut](https://github.com/potatochipcoconut),
+whose careful root-cause writeup (chunk-by-chunk timings, comparison
+against PyMuPDF's `doc.select()`, and a profiling-grade reproduction
+case from an AWS Lambda IDP pipeline) made this fix possible.
+
+Measured on the public 1112-page / 38 MB *Artificial Intelligence — A
+Modern Approach* corpus (`pdfs_slow2/`) on an idle laptop:
+
+| Workload | 0.3.43 | 0.3.44 | Speedup |
+|---|---|---|---|
+| `extract_pages_to_bytes(0..300)` | 7301 ms / 36 MB out | **382 ms / 12 MB out** | **19×** + 3× smaller |
+| `extract_pages_to_bytes(0..50)`  | 7983 ms / 36 MB out | **155 ms / 4 MB out**  | **51×** + 9× smaller |
+| Sequential 23 × 50-page chunks   | ~3 min               | **1542 ms total**       | ~120× |
+
+Extrapolating to the reporter's 12k-page / 50 MB document chunked
+into five 3000-page slices: an AWS Lambda invocation that previously
+timed out at 900 s after two chunks now finishes the entire
+five-chunk batch in roughly 30 s.
+
+#### Root causes
+
+All in `src/editor/document_editor.rs` + `src/document.rs`:
+
+1. **Triple full-document rewrite.** `extract_pages_to_bytes`
+   serialised the whole doc, re-parsed the bytes, removed pages
+   one at a time, and serialised again — three full passes when
+   one would do. Replaced with a non-mutating in-place trimmed
+   `page_order`, restored after the save (even on `Err`).
+2. **Garbage collector walked the original page tree.** The
+   trimmed `/Pages` dict was rebuilt locally inside
+   `write_full_to_writer`, but `collect_reachable_ids()` started
+   its BFS from the *unmodified* catalog and pulled in every
+   dropped page's resources — so the output never shrank no
+   matter how few pages were kept. Fixed by staging the trimmed
+   `/Pages` dict in `modified_objects` before the save; the
+   GC walker already prefers staged dicts over source.
+3. **`get_page_ref(i)` in a 0..n loop is O(n²).** Each call walks
+   the page tree from the root and stops at the i-th leaf, so
+   collecting all n leaf refs walks 1 + 2 + … + n nodes. New
+   helper `PdfDocument::all_page_refs()` does it in one DFS.
+   The flat-tree common case (root `/Pages` whose `/Count`
+   matches `Kids.len()`) reads the ref array straight out of
+   `/Kids` without touching individual leaves at all.
+
+The same n² loop pattern was lurking in four other call sites
+on the reporter's hot path (their pipeline does PDF/A validate +
+convert before the chunked extract). All five collapsed to a
+single `all_page_refs()` call:
+
+- `src/outline.rs` — `find_page_index` (O(n²) per outline
+  entry → O(n³) on documents with bookmarks).
+- `src/editor/document_editor.rs` line ~4275 — page-ref → index
+  map for partial form-flatten.
+- `src/editor/document_editor.rs` line ~4505 — same map for
+  `get_form_fields()`.
+- `src/compliance/validators.rs` — `validate_fonts`
+  (`doc.validate_pdf_a('2b')`).
+- `src/compliance/converter.rs` — per-page `/AA` strip
+  (`doc.convert_to_pdfa('2b')`).
+
+#### New API
+
+Two additions, both directly requested by @potatochipcoconut in
+#474; both available in Rust and Python (the other bindings can
+be added on demand):
+
+```python
+# Batch extraction — same single-call efficiency, ergonomic for
+# the chunked-for-OCR / chunked-for-S3 pattern.
+chunks = doc.extract_page_ranges_to_bytes(
+    [(0, 3000), (3000, 6000), (6000, 9000), (9000, 12000)]
+)
+
+# In-place selection — equivalent to PyMuPDF's doc.select(...).
+# After this call, the document holds only the listed pages,
+# in the order given. doc.save() / doc.save_to_bytes() then
+# emit only those pages with garbage-collected resources.
+doc.select_pages([1, 4, 7, 99])
+```
+
+#### Known limitation
+
+PDFs whose `/Pages` root publishes shared `/Resources` used by
+*all* leaf pages (typical of high-resolution book scans, atypical
+of office documents with subset fonts) still produce full-size
+chunk output: GC correctly preserves resources reachable from
+kept pages, and a single shared resource pool stays reachable as
+long as any kept page references it. The principled fix is
+per-page resource sub-setting — parsing each kept page's content
+stream to determine which fonts / XObjects are actually used and
+emitting a minimal `/Resources` for that page. That is a feature,
+not a bug fix, and is deferred from this release. The wall-clock
+speedup (12–54×) holds regardless.
+
 ### Tests
 
 - 5050 lib tests pass under `--features python,fips`
@@ -153,6 +253,14 @@ HSMs), and the legacy-PDF policy table.
 - 69 signatures tests still pass byte-equal post-rewire.
 - Hash vectors validated against NIST FIPS 180-4 for SHA-256/384/512
   and RFC 1321 / 3174 for MD5 / SHA-1.
+- New regression tests cover the issue #474 workflow:
+  `test_extract_pages_chunked_sequential` (4 sequential chunks
+  on the same `DocumentEditor`, source observably unchanged
+  between calls), `test_extract_pages_non_sequential`
+  (out-of-order indices `[3, 0, 4]`),
+  `test_extract_page_ranges_to_bytes_batch`,
+  `test_select_pages_in_place`, and
+  `test_select_pages_out_of_range`.
 
 ## [0.3.43] - 2026-05-03
 

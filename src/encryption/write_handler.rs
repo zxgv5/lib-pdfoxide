@@ -181,55 +181,46 @@ impl EncryptionWriteHandler {
                 })
             },
             Algorithm::Aes128 => {
-                // Generate random IV
-                let iv = Self::generate_iv();
-                match aes::aes128_encrypt(key, &iv, data) {
-                    Ok(ciphertext) => {
-                        // Prepend IV to ciphertext
-                        let mut result = iv.to_vec();
-                        result.extend(ciphertext);
-                        result
+                match Self::generate_iv() {
+                    Ok(iv) => match aes::aes128_encrypt(key, &iv, data) {
+                        Ok(ciphertext) => {
+                            let mut result = iv.to_vec();
+                            result.extend(ciphertext);
+                            result
+                        },
+                        Err(_) => data.to_vec(),
                     },
-                    Err(_) => data.to_vec(), // Fallback on error
+                    Err(e) => {
+                        log::error!("encrypt_with_key: AES-128 IV generation failed: {e} — returning plaintext");
+                        data.to_vec()
+                    },
                 }
             },
             Algorithm::Aes256 => {
-                // Generate random IV
-                let iv = Self::generate_iv();
-                match aes::aes256_encrypt(key, &iv, data) {
-                    Ok(ciphertext) => {
-                        // Prepend IV to ciphertext
-                        let mut result = iv.to_vec();
-                        result.extend(ciphertext);
-                        result
+                match Self::generate_iv() {
+                    Ok(iv) => match aes::aes256_encrypt(key, &iv, data) {
+                        Ok(ciphertext) => {
+                            let mut result = iv.to_vec();
+                            result.extend(ciphertext);
+                            result
+                        },
+                        Err(_) => data.to_vec(),
                     },
-                    Err(_) => data.to_vec(), // Fallback on error
+                    Err(e) => {
+                        log::error!("encrypt_with_key: AES-256 IV generation failed: {e} — returning plaintext");
+                        data.to_vec()
+                    },
                 }
             },
         }
     }
 
-    /// Generate a random 16-byte IV for AES encryption.
-    fn generate_iv() -> [u8; 16] {
-        use md5::{Digest, Md5};
-
-        // Generate a UUID and hash it for randomness
-        let uuid = uuid::Uuid::new_v4();
-        let uuid_bytes = uuid.as_bytes();
-
-        let mut hasher = Md5::new();
-        hasher.update(uuid_bytes);
-
-        // Add timestamp for extra entropy
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default();
-        hasher.update(now.as_nanos().to_le_bytes());
-
-        let hash = hasher.finalize();
+    fn generate_iv() -> crate::Result<[u8; 16]> {
         let mut iv = [0u8; 16];
-        iv.copy_from_slice(&hash);
-        iv
+        crate::crypto::active()
+            .random_bytes(&mut iv)
+            .map_err(|e| crate::Error::InvalidPdf(format!("AES IV generation failed: {e}")))?;
+        Ok(iv)
     }
 
     /// Get the encryption algorithm.

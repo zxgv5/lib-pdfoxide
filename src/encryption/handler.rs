@@ -256,7 +256,7 @@ impl EncryptionHandler {
         // Unreachable when legacy-crypto is off: handler::new() rejects R≤4.
         #[cfg(not(feature = "legacy-crypto"))]
         return Err(Error::InvalidPdf(
-            "compute_object_key requires legacy-crypto feature (MD5)".to_string()
+            "compute_object_key requires legacy-crypto feature (MD5)".to_string(),
         ));
 
         #[cfg(feature = "legacy-crypto")]
@@ -280,7 +280,7 @@ impl EncryptionHandler {
 
             // Step d: Key is first (n + 5) bytes, max 16
             let key_len = (base_key.len() + 5).min(16);
-            return Ok(hash[..key_len].to_vec());
+            Ok(hash[..key_len].to_vec())
         }
     }
 }

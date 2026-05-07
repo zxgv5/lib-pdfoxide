@@ -2,7 +2,7 @@
 
 All notable changes to PDFOxide are documented here.
 
-## [0.3.45] - 2026-05-05
+## [0.3.45] - 2026-05-07
 
 ### Fixed
 

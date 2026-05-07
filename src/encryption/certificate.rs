@@ -528,16 +528,16 @@ fn generate_random_key(length: usize) -> Result<Vec<u8>> {
     #[cfg(not(feature = "legacy-crypto"))]
     {
         let mut key = vec![0u8; length];
-        crate::crypto::active().random_bytes(&mut key).map_err(|e| {
-            crate::Error::InvalidPdf(format!("failed to generate random key: {e}"))
-        })?;
+        crate::crypto::active()
+            .random_bytes(&mut key)
+            .map_err(|e| crate::Error::InvalidPdf(format!("failed to generate random key: {e}")))?;
         return Ok(key);
     }
 
     #[cfg(feature = "legacy-crypto")]
     {
-        use std::time::{SystemTime, UNIX_EPOCH};
         use md5::{Digest, Md5};
+        use std::time::{SystemTime, UNIX_EPOCH};
 
         let mut key = Vec::with_capacity(length);
 

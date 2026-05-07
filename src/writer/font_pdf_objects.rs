@@ -117,10 +117,7 @@ pub fn build_embedded_font_objects(
     if is_cff {
         // PDF spec §9.9 Table 126: FontFile3 streams carry /Subtype.
         // CIDFontType0C signals CFF-based CID font data.
-        ff_dict.insert(
-            "Subtype".to_string(),
-            ObjectSerializer::name("CIDFontType0C"),
-        );
+        ff_dict.insert("Subtype".to_string(), ObjectSerializer::name("CIDFontType0C"));
     } else {
         // Length1 is required for FontFile2 (TrueType) per PDF spec §9.9.
         ff_dict.insert("Length1".to_string(), ObjectSerializer::integer(byte_len));
@@ -167,7 +164,11 @@ pub fn build_embedded_font_objects(
         ("Ordering", ObjectSerializer::string("Identity")),
         ("Supplement", ObjectSerializer::integer(0)),
     ]);
-    let cidfont_subtype = if is_cff { "CIDFontType0" } else { "CIDFontType2" };
+    let cidfont_subtype = if is_cff {
+        "CIDFontType0"
+    } else {
+        "CIDFontType2"
+    };
     let mut cidfont_entries: Vec<(&str, Object)> = vec![
         ("Type", ObjectSerializer::name("Font")),
         ("Subtype", ObjectSerializer::name(cidfont_subtype)),

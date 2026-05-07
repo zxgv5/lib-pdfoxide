@@ -53,13 +53,17 @@ impl CryptoProvider for RustCryptoProvider {
         Ok(match algo {
             HashAlgorithm::Md5 => {
                 #[cfg(feature = "legacy-crypto")]
-                { Box::new(Md5Hasher::new()) }
+                {
+                    Box::new(Md5Hasher::new())
+                }
                 #[cfg(not(feature = "legacy-crypto"))]
-                { return Err(Error::AlgorithmNotPermitted {
-                    kind: crate::crypto::error::AlgorithmKind::Hash,
-                    name: "MD5",
-                    reason: "legacy-crypto feature disabled at compile time",
-                }); }
+                {
+                    return Err(Error::AlgorithmNotPermitted {
+                        kind: crate::crypto::error::AlgorithmKind::Hash,
+                        name: "MD5",
+                        reason: "legacy-crypto feature disabled at compile time",
+                    });
+                }
             },
             HashAlgorithm::Sha1 => {
                 #[cfg(feature = "signatures")]
@@ -254,11 +258,13 @@ impl SymmetricCipher for RustSymmetric {
     #[cfg_attr(not(feature = "legacy-crypto"), allow(unused_variables))]
     fn rc4(&self, key: &[u8], data: &[u8]) -> Result<Vec<u8>> {
         #[cfg(not(feature = "legacy-crypto"))]
-        { return Err(Error::AlgorithmNotPermitted {
-            kind: crate::crypto::error::AlgorithmKind::SymmetricCipher,
-            name: "RC4",
-            reason: "legacy-crypto feature disabled at compile time",
-        }); }
+        {
+            return Err(Error::AlgorithmNotPermitted {
+                kind: crate::crypto::error::AlgorithmKind::SymmetricCipher,
+                name: "RC4",
+                reason: "legacy-crypto feature disabled at compile time",
+            });
+        }
         #[cfg(feature = "legacy-crypto")]
         {
             if key.is_empty() || key.len() > 256 {
@@ -384,31 +390,19 @@ impl SignatureVerifier for RustVerifier {
         let (oid, digest) = match hash {
             HashAlgorithm::Sha1 => {
                 use sha1::Digest as _;
-                (
-                    der::oid::db::rfc5912::ID_SHA_1,
-                    sha1::Sha1::digest(message).to_vec(),
-                )
+                (der::oid::db::rfc5912::ID_SHA_1, sha1::Sha1::digest(message).to_vec())
             },
             HashAlgorithm::Sha256 => {
                 use sha2_v10::Digest as _;
-                (
-                    der::oid::db::rfc5912::ID_SHA_256,
-                    sha2_v10::Sha256::digest(message).to_vec(),
-                )
+                (der::oid::db::rfc5912::ID_SHA_256, sha2_v10::Sha256::digest(message).to_vec())
             },
             HashAlgorithm::Sha384 => {
                 use sha2_v10::Digest as _;
-                (
-                    der::oid::db::rfc5912::ID_SHA_384,
-                    sha2_v10::Sha384::digest(message).to_vec(),
-                )
+                (der::oid::db::rfc5912::ID_SHA_384, sha2_v10::Sha384::digest(message).to_vec())
             },
             HashAlgorithm::Sha512 => {
                 use sha2_v10::Digest as _;
-                (
-                    der::oid::db::rfc5912::ID_SHA_512,
-                    sha2_v10::Sha512::digest(message).to_vec(),
-                )
+                (der::oid::db::rfc5912::ID_SHA_512, sha2_v10::Sha512::digest(message).to_vec())
             },
             HashAlgorithm::Md5 => {
                 return Err(Error::Verification(

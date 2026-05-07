@@ -437,10 +437,8 @@ mod tests {
     /// correct PDF objects (FontFile3 / CIDFontType0, not FontFile2 / CIDFontType2).
     #[test]
     fn test_subset_cff_otf_preserves_magic() {
-        let font_path = concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/tests/fixtures/fonts/StandardSymbolsPS.otf"
-        );
+        let font_path =
+            concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/fonts/StandardSymbolsPS.otf");
         let font_bytes = std::fs::read(font_path).expect("StandardSymbolsPS.otf fixture missing");
 
         // Confirm the input is a CFF/OTF font

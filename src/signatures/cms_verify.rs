@@ -340,10 +340,12 @@ fn run_signer_crypto(sd: &SignedData) -> Result<(SignerVerify, Option<ObjectIden
     };
     // Pass the full message (signed_attrs bytes) — the provider hashes
     // internally, consistent with verify_rsa_pss and verify_ecdsa.
-    let outcome = match crypto::active()
-        .verifier()
-        .verify_rsa_pkcs1v15(&pubkey, hash_algo, &signed_attrs_bytes, sig_bytes)
-    {
+    let outcome = match crypto::active().verifier().verify_rsa_pkcs1v15(
+        &pubkey,
+        hash_algo,
+        &signed_attrs_bytes,
+        sig_bytes,
+    ) {
         Ok(()) => SignerVerify::Valid,
         Err(crypto::Error::Verification(_)) => SignerVerify::Invalid,
         Err(_) => SignerVerify::Unknown,

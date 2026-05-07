@@ -6,9 +6,9 @@
 //! PDF Spec: Section 7.6.3 - Standard Security Handler
 //! PDF 2.0 Spec (ISO 32000-2:2020): Section 7.6.4.3.3 - Algorithm 8-11 for R>=5
 
-use sha2::{Digest, Sha256, Sha384, Sha512};
 #[cfg(feature = "legacy-crypto")]
 use md5::Md5;
+use sha2::{Digest, Sha256, Sha384, Sha512};
 
 /// Padding string used in PDF encryption (32 bytes).
 ///
@@ -99,7 +99,7 @@ pub fn compute_encryption_key(
         }
 
         // Step i: Return first key_length bytes (max 16 for MD5)
-        return Ok(hash[..key_length.min(16)].to_vec());
+        Ok(hash[..key_length.min(16)].to_vec())
     }
 }
 
@@ -155,7 +155,9 @@ pub fn authenticate_user_password(
     }
 
     #[cfg(not(feature = "legacy-crypto"))]
-    { return None; }
+    {
+        return None;
+    }
 
     #[cfg(feature = "legacy-crypto")]
     {
@@ -185,9 +187,9 @@ pub fn authenticate_user_password(
         let matches = constant_time_compare(&user_key[..16], &expected_user_key[..16]);
 
         if matches {
-            return Some(key);
+            Some(key)
         } else {
-            return None;
+            None
         }
     }
 }
@@ -457,7 +459,7 @@ pub fn compute_owner_password_hash(
             }
         }
 
-        return Ok(result);
+        Ok(result)
     }
 }
 

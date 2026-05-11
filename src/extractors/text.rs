@@ -516,6 +516,19 @@ pub struct SpanMergingConfig {
     /// - Typical citation markers: 70-80% of text font size
     /// - Superscript usually: 50-80% of base font
     pub citation_font_size_ratio: f32,
+
+    /// When `false`, each `Tm` operator starts a fresh span regardless of position.
+    /// Use this to preserve column boundaries for callers that need per-positioned-run spans
+    /// (e.g. pdftotext `-bbox-layout` parity).
+    ///
+    /// # Warning
+    /// Disabling this on character-by-character-positioned PDFs (common in academic typesetting)
+    /// can produce very large span counts per page (100× or more).
+    ///
+    /// Default: `true` (existing behaviour preserved).
+    ///
+    /// Reference: ISO 32000-1 §9.4.2 / §9.4.4 NOTE 6.
+    pub merge_tm_tj_runs: bool,
 }
 
 impl Default for SpanMergingConfig {
@@ -531,6 +544,7 @@ impl Default for SpanMergingConfig {
             email_threshold_multiplier: 2.5,
             detect_citation_markers: false,
             citation_font_size_ratio: 0.75,
+            merge_tm_tj_runs: true,
         }
     }
 }
@@ -577,6 +591,7 @@ impl SpanMergingConfig {
             email_threshold_multiplier: 2.5,
             detect_citation_markers: false,
             citation_font_size_ratio: 0.75,
+            merge_tm_tj_runs: true,
         }
     }
 
@@ -610,6 +625,7 @@ impl SpanMergingConfig {
             email_threshold_multiplier: 2.5,
             detect_citation_markers: false,
             citation_font_size_ratio: 0.75,
+            merge_tm_tj_runs: true,
         }
     }
 
@@ -646,6 +662,7 @@ impl SpanMergingConfig {
             email_threshold_multiplier: 2.5,
             detect_citation_markers: false,
             citation_font_size_ratio: 0.75,
+            merge_tm_tj_runs: true,
         }
     }
 
@@ -690,6 +707,7 @@ impl SpanMergingConfig {
             email_threshold_multiplier: 2.5,
             detect_citation_markers: false,
             citation_font_size_ratio: 0.75,
+            merge_tm_tj_runs: true,
         }
     }
 
@@ -723,6 +741,7 @@ impl SpanMergingConfig {
             email_threshold_multiplier: 2.5,
             detect_citation_markers: false,
             citation_font_size_ratio: 0.75,
+            merge_tm_tj_runs: true,
         }
     }
 
@@ -766,6 +785,7 @@ impl SpanMergingConfig {
             email_threshold_multiplier: 2.5,
             detect_citation_markers: false,
             citation_font_size_ratio: 0.75,
+            merge_tm_tj_runs: true,
         }
     }
 }
@@ -3734,7 +3754,8 @@ impl<'doc> TextExtractor<'doc> {
                 // If the new Tm is on the same line with the same transform,
                 // keep accumulating into the existing buffer instead of flushing
                 // (avoids creating thousands of 1-char TextSpans per page).
-                let is_continuation = match self.tj_span_buffer {
+                // When merge_tm_tj_runs is false, every Tm always starts a fresh span.
+                let is_continuation = self.merging_config.merge_tm_tj_runs && match self.tj_span_buffer {
                     Some(ref mut buffer)
                         if !buffer.is_empty()
                             && f.round() as i32 == buffer.start_matrix.f.round() as i32
@@ -9839,6 +9860,70 @@ mod tests {
                     .join("");
                 text.contains("A") && text.contains("B")
             }
+        );
+    }
+
+    // ========================================================================
+    // TESTS: merge_tm_tj_runs opt-out (#488)
+    // ========================================================================
+
+    /// With the default config (merge_tm_tj_runs = true), multiple Tm+Tj operators
+    /// on the same line are batched into a single span.
+    #[test]
+    fn test_merge_tm_tj_runs_default_merges() {
+        let mut extractor = TextExtractor::new();
+        extractor.merging_config = SpanMergingConfig::legacy(); // fixed thresholds, merging on
+        let font = create_test_font();
+        extractor.add_font("F1".to_string(), font);
+
+        // Three separate Tm+Tj on the same baseline (same Y, same a/b/c/d, ascending e)
+        let stream =
+            b"BT /F1 12 Tf 1 0 0 1 100 700 Tm (A) Tj 1 0 0 1 107 700 Tm (B) Tj 1 0 0 1 114 700 Tm (C) Tj ET";
+        let spans = extractor.extract_text_spans(stream).unwrap();
+
+        // All three characters must be present
+        let text: String = spans.iter().map(|s| s.text.as_str()).collect();
+        assert!(text.contains('A') && text.contains('B') && text.contains('C'),
+            "All chars must be extracted, got: {:?}", text);
+
+        // The default merging should combine them into fewer spans than the number
+        // of Tm operators (3 Tms should not produce 3 separate spans)
+        assert!(
+            spans.len() < 3,
+            "Default merge_tm_tj_runs=true should combine same-line Tm+Tj into fewer than 3 spans, got {} spans",
+            spans.len()
+        );
+    }
+
+    /// With merge_tm_tj_runs = false, each Tm operator starts a fresh span.
+    #[test]
+    fn test_merge_tm_tj_runs_disabled_splits() {
+        let mut extractor = TextExtractor::new();
+        extractor.merging_config = SpanMergingConfig {
+            merge_tm_tj_runs: false,
+            ..SpanMergingConfig::legacy()
+        };
+        let font = create_test_font();
+        extractor.add_font("F1".to_string(), font);
+
+        // Three separate Tm+Tj on the same baseline
+        let stream =
+            b"BT /F1 12 Tf 1 0 0 1 100 700 Tm (A) Tj 1 0 0 1 107 700 Tm (B) Tj 1 0 0 1 114 700 Tm (C) Tj ET";
+        let spans = extractor.extract_text_spans(stream).unwrap();
+
+        // All three characters must still be present
+        let text: String = spans.iter().map(|s| s.text.as_str()).collect();
+        assert!(text.contains('A') && text.contains('B') && text.contains('C'),
+            "All chars must be extracted even with merging disabled, got: {:?}", text);
+
+        // With merge disabled, each Tm flushes the buffer, so we get more spans
+        // than with merging enabled (post-processing merge_adjacent_spans may combine
+        // some, but at minimum we should get spans >= 1; the key invariant is that
+        // the span count here is NOT reduced by the Tm-continuation shortcut)
+        assert!(
+            spans.len() >= 2,
+            "merge_tm_tj_runs=false should not batch same-line runs; expected >= 2 spans, got {}",
+            spans.len()
         );
     }
 

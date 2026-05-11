@@ -1766,6 +1766,17 @@ enum ByteMode {
 fn get_byte_mode(font: Option<&FontInfo>) -> ByteMode {
     if let Some(font) = font {
         if font.subtype == "Type0" {
+            // If the ToUnicode CMap declares a 2-byte codespace range, always use
+            // TwoByte mode regardless of the encoding name.  This handles CJK fonts
+            // whose /Encoding name is a custom CMap stream that doesn't match the
+            // well-known keyword patterns below (e.g. "H", "V", "UniCNS-H", …).
+            // See PDF Spec §9.7.5 — `begincodespacerange` is authoritative.
+            if let Some(ref lazy_cmap) = font.to_unicode {
+                if lazy_cmap.code_width() == 2 {
+                    return ByteMode::TwoByte;
+                }
+            }
+
             match &font.encoding {
                 crate::fonts::Encoding::Identity => ByteMode::TwoByte,
                 crate::fonts::Encoding::Standard(name) => {
@@ -5975,15 +5986,11 @@ impl<'doc> TextExtractor<'doc> {
                 }
                 w_sum
             } else {
-                // Type0/CID font: process 2-byte CID codes (Identity-H encoding)
-                // Per ISO 32000-1:2008 Section 9.7.6.2, composite fonts use multi-byte codes
+                // Type0/CID font: use TextCharIter so that the byte-width (1 or 2)
+                // is determined by the font's encoding / ToUnicode CMap codespace,
+                // not hardcoded to 2.  Per ISO 32000-1:2008 §9.7.6.2.
                 let mut w_sum = 0.0f32;
-                for chunk in text.chunks(2) {
-                    let cid = if chunk.len() == 2 {
-                        ((chunk[0] as u16) << 8) | (chunk[1] as u16)
-                    } else {
-                        chunk[0] as u16
-                    };
+                for (cid, _) in TextCharIter::new(text, Some(font)) {
                     let mut w = font.get_glyph_width(cid) * fs_factor * hs_factor;
                     w += cs_hs;
                     // Per ISO 32000-1:2008 Section 9.3.3: Tw applied when CID == 32
@@ -6318,14 +6325,13 @@ impl<'doc> TextExtractor<'doc> {
                 w_sum
             } else {
                 buffer.append(text)?;
-                // Width calculation: process 2-byte CID codes (Identity-H encoding)
+                // Width calculation: use TextCharIter so byte-width respects the
+                // CMap codespace (1 or 2 bytes per character).  Fixes CJK fonts
+                // whose encoding name doesn't match the well-known Identity-H/EUC/…
+                // keyword patterns but whose ToUnicode CMap declares a 2-byte
+                // codespace range (§9.7.5).
                 let mut w_sum = 0.0f32;
-                for chunk in text.chunks(2) {
-                    let cid = if chunk.len() == 2 {
-                        ((chunk[0] as u16) << 8) | (chunk[1] as u16)
-                    } else {
-                        chunk[0] as u16
-                    };
+                for (cid, _) in TextCharIter::new(text, Some(font)) {
                     let mut w = font.get_glyph_width(cid) * fs_factor * hs_factor;
                     w += cs_hs;
                     if cid == 32 {

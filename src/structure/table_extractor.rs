@@ -627,7 +627,49 @@ fn extract_cell(
                                 let gap = block.bbox.x - (prev.bbox.x + prev.bbox.width);
                                 let font_size =
                                     prev.avg_font_size.max(block.avg_font_size).max(1.0);
-                                gap > font_size * 0.15
+                                if !(gap > font_size * 0.15) {
+                                    false
+                                } else {
+                                    // Suppress space insertion when one side is CJK and the
+                                    // other is CJK or a fullwidth/math operator (e.g. ≤, ＜, μ).
+                                    // This mirrors the CJK-pair suppression in document.rs and
+                                    // converters/mod.rs (Issue #485).
+                                    #[inline(always)]
+                                    fn is_cjk(c: char) -> bool {
+                                        matches!(c,
+                                            '\u{3040}'..='\u{309F}' |   // Hiragana
+                                            '\u{30A0}'..='\u{30FF}' |   // Katakana
+                                            '\u{4E00}'..='\u{9FFF}' |   // CJK Unified Ideographs
+                                            '\u{AC00}'..='\u{D7AF}' |   // Hangul
+                                            '\u{3400}'..='\u{4DBF}' |   // CJK Extension A
+                                            '\u{20000}'..='\u{2A6DF}'   // CJK Extension B
+                                        )
+                                    }
+                                    #[inline(always)]
+                                    fn is_fw_math(c: char) -> bool {
+                                        matches!(c,
+                                            '\u{FF0B}' | '\u{FF0D}' |
+                                            '\u{FF1A}' | '\u{FF1B}' |
+                                            '\u{FF1C}'..='\u{FF1E}' |
+                                            '\u{2260}' | '\u{2248}' |
+                                            '\u{2264}'..='\u{2265}' |
+                                            '\u{00B5}' | '\u{03BC}' |
+                                            '\u{00B1}' | '\u{00D7}' | '\u{00F7}'
+                                        )
+                                    }
+                                    let p_last = prev.text.chars().next_back();
+                                    let b_first = block.text.chars().next();
+                                    let suppress = if let (Some(p), Some(b)) = (p_last, b_first) {
+                                        let p_cjk = is_cjk(p);
+                                        let b_cjk = is_cjk(b);
+                                        (p_cjk || is_fw_math(p))
+                                            && (b_cjk || is_fw_math(b))
+                                            && (p_cjk || b_cjk)
+                                    } else {
+                                        false
+                                    };
+                                    !suppress
+                                }
                             }
                         } else {
                             !cell_text.ends_with(' ')

@@ -18,6 +18,7 @@
 //! Jaccard similarity on whitespace-split word tokens.  This differs from
 //! kreuzberg's word-F1 but is a good proxy that avoids the kreuzberg dependency.
 
+use pdf_oxide::converters::ConversionOptions;
 use pdf_oxide::document::PdfDocument;
 use std::collections::HashSet;
 
@@ -188,6 +189,110 @@ fn quality_gate_issue_336() {
         "/tmp/gt_issue-336-example.txt",
         0.69,
     );
+}
+
+// ---------------------------------------------------------------------------
+// issue-336-example.pdf — to_markdown quality gate (#485)
+// Same PDF as quality_gate_issue_336 but exercising the to_markdown path so
+// that the CJK fullwidth-operator space-suppression fix is covered end-to-end.
+// Threshold set to the same floor used for extract_text (0.69).
+// ---------------------------------------------------------------------------
+#[test]
+#[ignore = "requires /tmp/issue-336-example.pdf and /tmp/gt_issue-336-example.txt"]
+fn quality_gate_issue_336_markdown() {
+    let pdf_path = "/tmp/issue-336-example.pdf";
+    let gt_path = "/tmp/gt_issue-336-example.txt";
+    let bytes = match std::fs::read(pdf_path) {
+        Ok(b) => b,
+        Err(_) => {
+            eprintln!("SKIP issue-336-example (markdown): {pdf_path} not found");
+            return;
+        },
+    };
+    let gt_text = match std::fs::read_to_string(gt_path) {
+        Ok(t) => t,
+        Err(_) => {
+            eprintln!("SKIP issue-336-example (markdown): ground truth {gt_path} not found");
+            return;
+        },
+    };
+    let doc = PdfDocument::from_bytes(bytes).expect("parse PDF");
+    let _ = doc.authenticate(b"");
+    let options = ConversionOptions::default();
+    let mut text = String::new();
+    for i in 0..doc.page_count().unwrap_or(0) {
+        if let Ok(t) = doc.to_markdown(i, &options) {
+            text.push_str(&t);
+            text.push('\n');
+        }
+    }
+    let j = jaccard(&text, &gt_text);
+    assert!(
+        j >= 0.69,
+        "issue-336-example (markdown): Jaccard {j:.3} < threshold 0.69\n\
+         This is a quality regression — to_markdown score dropped."
+    );
+    eprintln!("PASS issue-336-example (markdown)      j={j:.3}  thr=0.69");
+}
+
+// ---------------------------------------------------------------------------
+// issue-336-example.pdf — to_html quality gate (#485)
+// Same PDF as quality_gate_issue_336 but exercising the to_html path.
+// HTML tags are stripped before computing Jaccard so the score reflects
+// actual text content rather than markup.
+// Threshold set slightly lower than to_markdown (0.65) to account for minor
+// HTML-wrapping differences.
+// ---------------------------------------------------------------------------
+#[test]
+#[ignore = "requires /tmp/issue-336-example.pdf and /tmp/gt_issue-336-example.txt"]
+fn quality_gate_issue_336_html() {
+    let pdf_path = "/tmp/issue-336-example.pdf";
+    let gt_path = "/tmp/gt_issue-336-example.txt";
+    let bytes = match std::fs::read(pdf_path) {
+        Ok(b) => b,
+        Err(_) => {
+            eprintln!("SKIP issue-336-example (html): {pdf_path} not found");
+            return;
+        },
+    };
+    let gt_text = match std::fs::read_to_string(gt_path) {
+        Ok(t) => t,
+        Err(_) => {
+            eprintln!("SKIP issue-336-example (html): ground truth {gt_path} not found");
+            return;
+        },
+    };
+    let doc = PdfDocument::from_bytes(bytes).expect("parse PDF");
+    let _ = doc.authenticate(b"");
+    let options = ConversionOptions::default();
+    let mut html = String::new();
+    for i in 0..doc.page_count().unwrap_or(0) {
+        if let Ok(t) = doc.to_html(i, &options) {
+            html.push_str(&t);
+            html.push('\n');
+        }
+    }
+    // Strip HTML tags: replace <...> sequences with a space so word tokens survive.
+    let stripped = {
+        let mut out = String::with_capacity(html.len());
+        let mut in_tag = false;
+        for c in html.chars() {
+            match c {
+                '<' => { in_tag = true; out.push(' '); },
+                '>' => { in_tag = false; out.push(' '); },
+                _ if in_tag => {},
+                _ => out.push(c),
+            }
+        }
+        out
+    };
+    let j = jaccard(&stripped, &gt_text);
+    assert!(
+        j >= 0.65,
+        "issue-336-example (html): Jaccard {j:.3} < threshold 0.65\n\
+         This is a quality regression — to_html score dropped."
+    );
+    eprintln!("PASS issue-336-example (html)          j={j:.3}  thr=0.65");
 }
 
 // ---------------------------------------------------------------------------

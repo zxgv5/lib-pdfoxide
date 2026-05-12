@@ -4388,7 +4388,7 @@ impl PdfDocument {
                     // Using per-cell bboxes (rather than the coarser table bbox) prevents
                     // dropping paragraph spans that lie inside the table's outer bounding
                     // box but were not captured as table cells by the spatial detector.
-                    tables.iter().any(|t| {
+                    if tables.iter().any(|t| {
                         t.rows.iter().any(|r| {
                             r.cells.iter().any(|c| {
                                 c.bbox.is_some_and(|b| {
@@ -4399,6 +4399,37 @@ impl PdfDocument {
                                     )
                                 })
                             })
+                        })
+                    }) {
+                        return true;
+                    }
+                    // Fallback: text-based match. The bbox check above uses
+                    // a tight 0.1pt tolerance and rejects spans whose font
+                    // ascent extends slightly above the cell's ink box (issue
+                    // 484: "FY 15 1st Q TTL" labels in JAL traffic table —
+                    // span height = font_size = 10.7pt, but cell bbox height
+                    // = 15.96pt covers two ink rows so the label glyphs reach
+                    // ~0.4pt above the cell's top edge). When a span's
+                    // trimmed text exactly matches some cell's text, the cell
+                    // already owns it — keeping it in flow would duplicate.
+                    let trimmed = s.text.trim();
+                    if trimmed.is_empty() {
+                        return false;
+                    }
+                    if !table_cell_texts.contains(trimmed) {
+                        return false;
+                    }
+                    // Require spatial proximity: the span must lie inside
+                    // some table's outer bbox so we don't drop body text that
+                    // coincidentally matches a cell's text elsewhere on the page.
+                    tables.iter().any(|t| {
+                        t.bbox.is_some_and(|tb| {
+                            let cx = s.bbox.x + s.bbox.width / 2.0;
+                            let cy = s.bbox.y + s.bbox.height / 2.0;
+                            cx >= tb.x - RETAIN_TOLERANCE
+                                && cx <= tb.x + tb.width + RETAIN_TOLERANCE
+                                && cy >= tb.y - RETAIN_TOLERANCE
+                                && cy <= tb.y + tb.height + RETAIN_TOLERANCE
                         })
                     })
                 };
@@ -5636,6 +5667,8 @@ impl PdfDocument {
                 | 0x4E00..=0x9FFF // CJK Unified Ideographs
                 | 0xAC00..=0xD7AF // Hangul Syllables
                 | 0x20000..=0x2A6DF // CJK Unified Ideographs Extension B
+                | 0xFF00..=0xFFEF // Halfwidth and Fullwidth Forms
+                | 0x3000..=0x303F // CJK Symbols and Punctuation
             )
         };
         if prev_tail.is_some_and(is_cjk) && curr_head.is_some_and(is_cjk) {
@@ -5645,6 +5678,26 @@ impl PdfDocument {
         // Calculate horizontal gap
         let prev_end_x = prev.bbox.x + prev.bbox.width;
         let gap = current.bbox.x - prev_end_x;
+
+        // CJK ↔ non-CJK boundary: pdftotext (and the GT it produces) inserts
+        // a space wherever a CJK ideograph meets a Latin/digit character on
+        // the same line, regardless of how tightly the two glyphs were
+        // typeset.  Without this, mixed-script content like "神鹰集团" + "2015"
+        // collapses into one word-F1 token "神鹰集团2015", which never matches
+        // GT's separate "神鹰集团" and "2015" tokens (issue 484, pr-136).
+        // Force a space at the script boundary as long as the two glyphs are
+        // not horizontally overlapping (genuine kerning) and the gap is
+        // within the same-line column.
+        let crosses_cjk_boundary = match (prev_tail, curr_head) {
+            (Some(p), Some(c)) => is_cjk(p) != is_cjk(c),
+            _ => false,
+        };
+        if crosses_cjk_boundary
+            && gap > -0.5
+            && gap < font_size * 5.0
+        {
+            return true;
+        }
 
         // Space threshold: 0.15 × font size
         // Typical space width is ~0.25em, so 0.15em catches gaps > 60% of a space.
@@ -6321,29 +6374,32 @@ impl PdfDocument {
                 }
             }
 
-            // Only subtypes whose /Contents is rendered as visible page content.
-            // Per ISO 32000-1 §12.5.6.2 (Table 166), the /Contents key in ALL markup
-            // Per ISO 32000-1 §12.5.6.2 (Table 166), the /Contents of markup
-            // annotations — including Highlight, Underline, StrikeOut, Squiggly,
-            // Ink, Caret, FileAttachment, Redact, and geometric shapes (Line,
-            // Circle, Square, Polygon, PolyLine) — is popup/comment text written
-            // by a reviewer, NOT text displayed on the page. Only FreeText, Text
-            // (note icon), and Stamp annotations have /Contents that represents the
-            // annotation's visible label or overlay.
-            let has_contents = matches!(subtype_lc.as_str(), "text" | "freetext" | "stamp");
-            if !has_contents {
+            // Only FreeText and Stamp have /Contents representing visible page text.
+            // Text (sticky-note) /Contents is reviewer comment text shown in a pop-up
+            // window, not rendered on the page — exclude it to avoid injecting popup
+            // notes into the body text stream.
+            // For FreeText/Stamp: try /Contents first; fall back to AP stream so that
+            // Stamp annotations with empty /Contents but a rendered AP stream are included.
+            let is_visible = matches!(subtype_lc.as_str(), "freetext" | "stamp");
+            if !is_visible {
                 continue;
             }
 
-            let text = match dict.get("Contents") {
-                Some(Object::String(s)) => {
+            let text = {
+                let from_contents = if let Some(Object::String(s)) = dict.get("Contents") {
                     let decoded = Self::decode_pdf_text_string(s).trim().to_string();
-                    if decoded.is_empty() {
-                        continue;
+                    if decoded.is_empty() { None } else { Some(decoded) }
+                } else {
+                    None
+                };
+                if let Some(t) = from_contents {
+                    t
+                } else {
+                    match self.extract_text_from_ap_stream(&dict) {
+                        Some(ap_text) if !ap_text.trim().is_empty() => ap_text.trim().to_string(),
+                        _ => continue,
                     }
-                    decoded
-                },
-                _ => continue,
+                }
             };
 
             // Use /Rect as the annotation's bounding box.
@@ -6573,7 +6629,7 @@ impl PdfDocument {
                     // Skip them here to avoid duplicate text at the end of output.
                     continue;
                 },
-                "freetext" | "stamp" | "text" => {
+                "freetext" | "stamp" => {
                     if let Some(Object::String(s)) = dict.get("Contents") {
                         let decoded = Self::decode_pdf_text_string(s);
                         let trimmed = decoded.trim().to_string();
@@ -6582,6 +6638,9 @@ impl PdfDocument {
                         }
                     }
                 },
+                // Text (sticky-note) /Contents is reviewer popup comment text, not
+                // visible page content — skip to avoid injecting popup notes.
+                "text" => {},
                 // Geometric shape annotations — per §12.5.6.2, their /Contents is
                 // also popup/comment text, same as the markup group below.
                 "line" | "circle" | "square" | "polygon" | "polyline" => {
@@ -15878,11 +15937,13 @@ mod tests {
 
     #[test]
     fn test_annotation_text_type() {
+        // Text (sticky-note) /Contents is reviewer popup comment text, not visible page
+        // content — it must NOT appear in extract_text output (ISO 32000-1 §12.5.6.2).
         let annot = b"4 0 obj\n<< /Type /Annot /Subtype /Text /Contents (Sticky note) >>\nendobj\n"
             .to_vec();
         let pdf = build_pdf_with_annotations(vec![(4, annot)]);
         let doc = PdfDocument::from_bytes(pdf).unwrap();
-        assert!(doc.extract_text(0).unwrap().contains("Sticky note"));
+        assert!(!doc.extract_text(0).unwrap().contains("Sticky note"));
     }
 
     #[test]
@@ -15957,6 +16018,8 @@ mod tests {
 
     #[test]
     fn test_annotation_multiple() {
+        // FreeText /Contents is visible page text; Text (sticky-note) /Contents is popup
+        // comment — only FreeText should appear in extract_text output.
         let a1 =
             b"4 0 obj\n<< /Type /Annot /Subtype /FreeText /Contents (First) >>\nendobj\n".to_vec();
         let a2 =
@@ -15965,7 +16028,7 @@ mod tests {
         let doc = PdfDocument::from_bytes(pdf).unwrap();
         let text = doc.extract_text(0).unwrap();
         assert!(text.contains("First"));
-        assert!(text.contains("Second"));
+        assert!(!text.contains("Second"));
     }
 
     #[test]

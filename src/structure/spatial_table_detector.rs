@@ -2980,10 +2980,17 @@ pub fn detect_tables_with_lines(
     // spurious line-based tables don't shadow valid text-based ones.
     final_tables.retain(is_valid_table);
 
-    // Only allow text-based fallback if BOTH strategies permit it.
-    // If horizontal_strategy is Lines, we require actual horizontal lines for row detection.
-    // If vertical_strategy is Lines, we require actual vertical lines for column detection.
-    let allow_text_fallback = config.horizontal_strategy != TableStrategy::Lines
+    // Only allow text-based fallback if BOTH strategies permit it AND the caller
+    // explicitly enabled text-only detection (config.text_fallback=true).
+    // This prevents extract_text() callers (text_fallback=false) from
+    // spuriously running span-column detection alongside ruling-line tables:
+    // report-style PDFs with decorative horizontal rules (e.g. swimming results)
+    // would otherwise have all their data detected as a text table that renders
+    // the page content a second time, causing duplicate extraction.
+    // Callers that want text-based table detection (to_markdown, to_html) set
+    // config.text_fallback=true explicitly.
+    let allow_text_fallback = config.text_fallback
+        && config.horizontal_strategy != TableStrategy::Lines
         && config.vertical_strategy != TableStrategy::Lines;
 
     if allow_text_fallback {
@@ -3396,9 +3403,15 @@ mod tests {
             create_test_span("21", 90.0, 140.0, 20.0, 10.0),
         ];
 
-        // With the default Both strategy and NO lines, the text-based fallback
-        // inside detect_tables_with_lines fires and finds the grid.
-        let config = TableDetectionConfig::default();
+        // With the Both strategy, NO lines, and text_fallback explicitly
+        // enabled, the text-based fallback inside detect_tables_with_lines
+        // fires and finds the grid.  Issue 484: the default no longer enables
+        // text_fallback to avoid spurious tables on report-style PDFs that
+        // would otherwise be double-emitted by extract_text.
+        let config = TableDetectionConfig {
+            text_fallback: true,
+            ..TableDetectionConfig::default()
+        };
         let tables = detect_tables_with_lines(&spans, &[], &config);
         assert_eq!(
             tables.len(),

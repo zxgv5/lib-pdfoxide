@@ -10713,6 +10713,17 @@ impl PdfDocument {
             &config,
         );
 
+        // Issue 484/486/487: when a logical multi-row table is drawn with a
+        // horizontal ruling line between every pair of rows, the line-based
+        // detector emits one Table per row strip. Each fragment is a 1- or
+        // 2-row table that fails is_real_grid below and gets dropped, after
+        // which the cells fall through to paragraph flow with column-based
+        // reading order — producing orphan `<p>40000≤Q</p>` /
+        // `<p>＜55000</p>` pairs.  Consolidate vertically-adjacent fragments
+        // that share an identical column structure BEFORE applying
+        // is_real_grid so the merged multi-row table survives the filter.
+        let raw_tables = crate::structure::spatial_table_detector::consolidate_adjacent_table_fragments(raw_tables);
+
         // Per #457 Step 4: spatial detection without struct-tree backing
         // is prone to false positives on form-style layouts (label-colon-
         // value pairs that align horizontally, form fillable boxes drawn

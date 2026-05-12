@@ -3224,6 +3224,114 @@ fn cell_span_separator(prev: &TextSpan, current: &TextSpan) -> &'static str {
     " "
 }
 
+/// Consolidate vertically-adjacent tables that share an identical column
+/// structure into a single multi-row table.
+///
+/// Issue 484/486/487 root cause: when a logical multi-row table is drawn
+/// with a horizontal ruling line between every pair of rows (rather than
+/// only at the top and bottom), the line-based detector emits one Table
+/// per row strip. Each fragment is a 1- or 2-row table that fails
+/// `is_real_grid()` (which requires ≥2 rows) and gets dropped, after
+/// which the cells fall through to the paragraph flow with column-based
+/// reading order — producing orphan `<p>40000≤Q</p>` / `<p>＜55000</p>`
+/// pairs instead of `<table><td>40000≤Q＜55000</td></tr></table>`.
+///
+/// Two fragments are merge-candidates when:
+///   * both have a `bbox`
+///   * X start matches within `X_TOLERANCE`
+///   * width matches within `X_TOLERANCE`
+///   * column counts are equal
+///   * the lower fragment's top edge (`bbox.y + bbox.height`) is within
+///     `Y_TOLERANCE` of the upper fragment's bottom edge (`bbox.y`)
+///
+/// Sort tables top-down (PDF y-up: largest top-Y first) and merge runs
+/// of consecutive fragments that satisfy the criteria. The merged table
+/// preserves the union of all rows and a bbox spanning both fragments.
+pub fn consolidate_adjacent_table_fragments(tables: Vec<Table>) -> Vec<Table> {
+    if tables.len() < 2 {
+        return tables;
+    }
+    const X_TOLERANCE: f32 = 2.0;
+    const Y_TOLERANCE: f32 = 3.0;
+
+    // Sort by top-Y descending (top of page first in PDF y-up coordinates).
+    let mut sorted = tables;
+    sorted.sort_by(|a, b| {
+        let a_top = a.bbox.map(|b| b.y + b.height).unwrap_or(f32::NEG_INFINITY);
+        let b_top = b.bbox.map(|b| b.y + b.height).unwrap_or(f32::NEG_INFINITY);
+        crate::utils::safe_float_cmp(b_top, a_top)
+    });
+
+    let mut consolidated: Vec<Table> = Vec::with_capacity(sorted.len());
+    for table in sorted {
+        let merge_into_last = consolidated
+            .last()
+            .map(|last| can_merge_tables(last, &table, X_TOLERANCE, Y_TOLERANCE))
+            .unwrap_or(false);
+        if merge_into_last {
+            // Safety: merge_into_last is only true when consolidated.last()
+            // returned Some, so last_mut() must also return Some.
+            if let Some(last) = consolidated.last_mut() {
+                merge_table_into(last, table);
+            }
+        } else {
+            consolidated.push(table);
+        }
+    }
+    consolidated
+}
+
+fn can_merge_tables(upper: &Table, lower: &Table, x_tol: f32, y_tol: f32) -> bool {
+    let (Some(u_bbox), Some(l_bbox)) = (upper.bbox, lower.bbox) else {
+        return false;
+    };
+    if upper.col_count != lower.col_count || upper.col_count == 0 {
+        return false;
+    }
+    if (u_bbox.x - l_bbox.x).abs() > x_tol {
+        return false;
+    }
+    if (u_bbox.width - l_bbox.width).abs() > x_tol {
+        return false;
+    }
+    // upper sits ABOVE lower in PDF y-up: upper.bbox.y is the BOTTOM of
+    // upper, lower.bbox.y + lower.bbox.height is the TOP of lower.
+    // For them to be vertically adjacent, the upper.bottom must be close
+    // to the lower.top.  We allow a small NEGATIVE gap (overlap) up to
+    // half the smaller table's height — the line-based detector
+    // occasionally produces bboxes that overhang the adjacent table by a
+    // few points when ruling-rule strokes have non-zero thickness or
+    // include the line's drawn extent above/below the baseline.  Real
+    // distinct tables almost always have a meaningful positive gap.
+    let upper_bottom = u_bbox.y;
+    let lower_top = l_bbox.y + l_bbox.height;
+    let gap = upper_bottom - lower_top;
+    if gap > y_tol {
+        return false;
+    }
+    let min_height = u_bbox.height.min(l_bbox.height);
+    if -gap > min_height * 0.5 {
+        return false;
+    }
+    true
+}
+
+fn merge_table_into(upper: &mut Table, lower: Table) {
+    if let (Some(ub), Some(lb)) = (upper.bbox, lower.bbox) {
+        let new_y = ub.y.min(lb.y);
+        let new_top = (ub.y + ub.height).max(lb.y + lb.height);
+        let new_x = ub.x.min(lb.x);
+        let new_right = (ub.x + ub.width).max(lb.x + lb.width);
+        upper.bbox = Some(crate::geometry::Rect {
+            x: new_x,
+            y: new_y,
+            width: new_right - new_x,
+            height: new_top - new_y,
+        });
+    }
+    upper.rows.extend(lower.rows);
+}
+
 fn detect_merged_cells(grid: &GridStructure, spans: &[TextSpan]) -> Vec<Vec<CellMergeInfo>> {
     let num_rows = grid.cells.len();
     let num_cols = grid.columns.len();

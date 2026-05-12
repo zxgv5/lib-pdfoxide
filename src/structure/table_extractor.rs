@@ -113,6 +113,14 @@ impl Table {
         // prose-split false tables have highly variable row fill counts (some rows
         // have 1-2 filled cells, others have 10+), so the fraction of "dense" rows
         // is well below 70%.
+        //
+        // Exception: a consolidated multi-row table (issue 486) can contain a mix
+        // of dense data rows and sparse header / multi-row-label rows.  The sparse
+        // rows are legitimate table content (column headers split across multiple
+        // visual rows, lane-count labels that only appear on the first row of a
+        // sub-group), so a strict dense-row ratio rejects real tables.  Accept the
+        // table if it has BOTH enough dense rows in absolute terms (≥ half the
+        // column count) AND a meaningful dense-row ratio (≥ 40 %).
         if self.col_count >= 8 {
             let min_dense = ((self.col_count as f32 * 0.6) as usize).max(2);
             let dense_rows = self
@@ -123,7 +131,11 @@ impl Table {
                 })
                 .count();
             let dense_row_ratio = dense_rows as f32 / self.rows.len() as f32;
-            return self.rows.len() >= 3 && ratio >= 0.7 && dense_row_ratio >= 0.70;
+            if self.rows.len() >= 3 && ratio >= 0.7 && dense_row_ratio >= 0.70 {
+                return true;
+            }
+            let min_absolute_dense = (self.col_count / 2).max(3);
+            return dense_rows >= min_absolute_dense && dense_row_ratio >= 0.40;
         }
 
         ratio >= 0.5

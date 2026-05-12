@@ -34,6 +34,82 @@ fn jaccard(a: &str, b: &str) -> f32 {
     }
 }
 
+/// Strip markdown syntax markers from a string so the Jaccard test
+/// compares text content rather than formatting markup.
+///
+/// Removes the same families of tokens that pdftotext's plain-text GT
+/// never contains:
+///   * `**...**` and `*...*` (bold / italic)
+///   * `|` table column separators
+///   * `---|---|---` separator-row sequences
+///   * leading `#` heading markers
+///   * fenced code-block fences
+///
+/// Mirrors the HTML test's tag-stripping rationale: the markdown
+/// converter's job is to produce the right text + structure; whether
+/// it wraps a number in `**...**` is a formatting concern, not a
+/// content-quality regression.
+fn strip_markdown(s: &str) -> String {
+    let chars: Vec<char> = s.chars().collect();
+    let mut out = String::with_capacity(s.len());
+    let mut i = 0;
+    let mut at_line_start = true;
+    while i < chars.len() {
+        let c = chars[i];
+        // `**` bold marker — drop two chars
+        if c == '*' && chars.get(i + 1) == Some(&'*') {
+            i += 2;
+            at_line_start = false;
+            continue;
+        }
+        // standalone `*` italic marker — drop
+        if c == '*' {
+            i += 1;
+            at_line_start = false;
+            continue;
+        }
+        // `|` table column separator — turn into space so neighbouring
+        // cells stay separated by whitespace for split_whitespace()
+        if c == '|' {
+            out.push(' ');
+            i += 1;
+            at_line_start = false;
+            continue;
+        }
+        // `# `, `## ` … heading marker at start of line — drop the run
+        if at_line_start && c == '#' {
+            while i < chars.len() && chars[i] == '#' {
+                i += 1;
+            }
+            continue;
+        }
+        // 3+ consecutive `-` (separator row) — turn into space
+        if c == '-' && chars.get(i + 1) == Some(&'-') && chars.get(i + 2) == Some(&'-') {
+            while i < chars.len() && chars[i] == '-' {
+                i += 1;
+            }
+            out.push(' ');
+            at_line_start = false;
+            continue;
+        }
+        // Fenced code block ``` — drop the line
+        if c == '`' && chars.get(i + 1) == Some(&'`') && chars.get(i + 2) == Some(&'`') {
+            while i < chars.len() && chars[i] != '\n' {
+                i += 1;
+            }
+            continue;
+        }
+        out.push(c);
+        at_line_start = c == '\n';
+        i += 1;
+    }
+    out
+}
+
+fn jaccard_markdown(md: &str, gt: &str) -> f32 {
+    jaccard(&strip_markdown(md), gt)
+}
+
 /// Extract text from all pages of a PDF at the given path.
 /// Returns None when the PDF file is not present (test skips).
 fn extract_all_text(pdf_path: &str) -> Option<String> {
@@ -226,7 +302,10 @@ fn quality_gate_issue_336_markdown() {
             text.push('\n');
         }
     }
-    let j = jaccard(&text, &gt_text);
+    // Strip markdown formatting markers before Jaccard so we compare
+    // content tokens rather than syntax (matches the HTML test which
+    // strips <...> tags).
+    let j = jaccard_markdown(&text, &gt_text);
     assert!(
         j >= 0.69,
         "issue-336-example (markdown): Jaccard {j:.3} < threshold 0.69\n\
@@ -512,17 +591,12 @@ fn check_markdown(label: &str, pdf: &str, gt: &str, threshold: f32) {
             return;
         },
     };
-    // Strip markdown table syntax (|, --, leading/trailing pipes) before Jaccard
-    // so the score reflects actual text tokens rather than formatting characters.
-    let plain: String = md
-        .lines()
-        .map(|line| {
-            // Replace pipe-separated table cells with spaces
-            line.replace('|', " ")
-        })
-        .collect::<Vec<_>>()
-        .join("\n");
-    let j = jaccard(&plain, &gt_text);
+    // Strip markdown formatting markers (**bold**, *italic*, | table
+    // separators, --- header rule, leading # headings, ``` fences)
+    // before computing Jaccard so the score reflects text content,
+    // not formatting characters that the plain-text GT was never
+    // going to contain.  Mirrors the HTML test's strip_html step.
+    let j = jaccard_markdown(&md, &gt_text);
     assert!(
         j >= threshold,
         "{label}: Jaccard {j:.3} < threshold {threshold:.2}\n\

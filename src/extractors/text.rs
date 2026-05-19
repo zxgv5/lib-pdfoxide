@@ -4140,6 +4140,7 @@ impl<'doc> TextExtractor<'doc> {
                                             origin_y: pos.y,
                                             rotation_degrees,
                                             advance_width: tx.abs(),
+                                            rendered_advance: tx.abs(),
                                             matrix: Some([
                                                 final_matrix.a,
                                                 final_matrix.b,
@@ -6806,8 +6807,16 @@ impl<'doc> TextExtractor<'doc> {
             let hs_factor = horizontal_scaling / 100.0;
             let glyph_width_user_space = glyph_width_font_units * fs_factor * hs_factor;
 
+            // Advance position: Tx = (w0 * Tfs + Tc + Tw) * Th
+            let mut tx = glyph_width_user_space;
+            tx += char_space * hs_factor;
+            if char_code == 32 {
+                tx += word_space * hs_factor;
+            }
+
             // For TextChar, we use the device-space width
             let glyph_width_device_space = glyph_width_user_space * combined_char.a.abs();
+            let tx_device_space = tx * combined_char.a.abs();
             let height_device_space = effective_font_size;
 
             // Determine font weight and style
@@ -6851,6 +6860,11 @@ impl<'doc> TextExtractor<'doc> {
             } else {
                 glyph_width_user_space
             };
+            let rendered_advance_per_char = if char_count > 0 {
+                tx_device_space / char_count as f32
+            } else {
+                tx_device_space
+            };
 
             for (char_index, unicode_char) in unicode_string.chars().enumerate() {
                 let should_skip = unicode_char == '\0'
@@ -6885,6 +6899,7 @@ impl<'doc> TextExtractor<'doc> {
                         origin_y: char_origin_y,
                         rotation_degrees,
                         advance_width: char_width_device,
+                        rendered_advance: rendered_advance_per_char,
                         matrix: Some([
                             final_matrix.a,
                             final_matrix.b,
@@ -6897,13 +6912,6 @@ impl<'doc> TextExtractor<'doc> {
 
                     self.chars.push(text_char);
                 }
-            }
-
-            // Advance position: Tx = (w0 * Tfs + Tc + Tw) * Th
-            let mut tx = glyph_width_user_space;
-            tx += char_space * hs_factor;
-            if char_code == 32 {
-                tx += word_space * hs_factor;
             }
 
             // Update text matrix in current state per ISO 32000-1:2008 §9.4.4
@@ -8815,6 +8823,7 @@ mod tests {
                 origin_y: 700.0,
                 rotation_degrees: 0.0,
                 advance_width: 6.0,
+                rendered_advance: 6.0,
                 matrix: None,
             },
             TextChar {
@@ -8831,6 +8840,7 @@ mod tests {
                 origin_y: 700.0,
                 rotation_degrees: 0.0,
                 advance_width: 6.0,
+                rendered_advance: 6.0,
                 matrix: None,
             },
         ];
@@ -8859,6 +8869,7 @@ mod tests {
                 origin_y: 700.0,
                 rotation_degrees: 0.0,
                 advance_width: 6.0,
+                rendered_advance: 6.0,
                 matrix: None,
             },
             TextChar {
@@ -8875,6 +8886,7 @@ mod tests {
                 origin_y: 680.0,
                 rotation_degrees: 0.0,
                 advance_width: 6.0,
+                rendered_advance: 6.0,
                 matrix: None,
             },
         ];
@@ -8909,6 +8921,7 @@ mod tests {
             origin_y: 700.0,
             rotation_degrees: 0.0,
             advance_width: 6.0,
+            rendered_advance: 6.0,
             matrix: None,
         };
 
@@ -8949,6 +8962,7 @@ mod tests {
             origin_y: 700.0,
             rotation_degrees: 0.0,
             advance_width: 6.0,
+            rendered_advance: 6.0,
             matrix: None,
         };
 
@@ -8985,6 +8999,7 @@ mod tests {
             origin_y: 700.0,
             rotation_degrees: 0.0,
             advance_width: advance_em * font_size,
+            rendered_advance: advance_em * font_size,
             matrix: None,
         };
 
@@ -9036,6 +9051,7 @@ mod tests {
             origin_y: 700.0,
             rotation_degrees: 0.0,
             advance_width: 2.5, // 0.278 em × 9 pt
+            rendered_advance: 2.5,
             matrix: None,
         };
 
@@ -9281,6 +9297,7 @@ mod tests {
                 origin_y: 680.0,
                 rotation_degrees: 0.0,
                 advance_width: 6.0,
+                rendered_advance: 6.0,
                 matrix: None,
             },
             TextChar {
@@ -9297,6 +9314,7 @@ mod tests {
                 origin_y: 700.0,
                 rotation_degrees: 0.0,
                 advance_width: 6.0,
+                rendered_advance: 6.0,
                 matrix: None,
             },
         ];
@@ -9326,6 +9344,7 @@ mod tests {
                 origin_y: 700.0,
                 rotation_degrees: 0.0,
                 advance_width: 6.0,
+                rendered_advance: 6.0,
                 matrix: None,
             },
             TextChar {
@@ -9342,6 +9361,7 @@ mod tests {
                 origin_y: 700.0,
                 rotation_degrees: 0.0,
                 advance_width: 6.0,
+                rendered_advance: 6.0,
                 matrix: None,
             },
         ];
@@ -9370,6 +9390,7 @@ mod tests {
                 origin_y: 0.0,
                 rotation_degrees: 0.0,
                 advance_width: 6.0,
+                rendered_advance: 6.0,
                 matrix: None,
             },
             TextChar {
@@ -9386,6 +9407,7 @@ mod tests {
                 origin_y: 700.0,
                 rotation_degrees: 0.0,
                 advance_width: 6.0,
+                rendered_advance: 6.0,
                 matrix: None,
             },
         ];

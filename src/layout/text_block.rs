@@ -130,6 +130,7 @@ impl TextSpan {
                         origin_y: self.bbox.y,
                         rotation_degrees: 0.0,
                         advance_width: w,
+                        rendered_advance: w,
                         matrix: Some([1.0, 0.0, 0.0, 1.0, 0.0, 0.0]),
                     }
                 })
@@ -158,6 +159,7 @@ impl TextSpan {
                     origin_y: self.bbox.y,
                     rotation_degrees: 0.0,
                     advance_width: char_width,
+                    rendered_advance: char_width,
                     matrix: Some([1.0, 0.0, 0.0, 1.0, 0.0, 0.0]),
                 })
                 .collect()
@@ -232,10 +234,29 @@ pub struct TextChar {
 
     /// Horizontal advance width (distance to next character position).
     ///
-    /// This is the amount the text position advances after drawing this
-    /// character, accounting for character width and any spacing. Used
-    /// for precise text layout calculations.
+    /// Glyph advance width from font metrics (device space).
+    ///
+    /// This is the advance for the glyph shape only — it does **not** include
+    /// character spacing (Tc), word spacing (Tw), or TJ kerning offsets.
+    /// For word-boundary detection, prefer [`rendered_advance`] which includes
+    /// all spacing adjustments and is equivalent to Poppler's `dx` argument.
     pub advance_width: f32,
+
+    /// Actual rendered advance to the next character's origin (device space).
+    ///
+    /// This is the full advance used to move the text position after this
+    /// character, including the glyph advance plus character spacing (Tc),
+    /// word spacing (Tw for U+0020), and any TJ kerning adjustments.
+    ///
+    /// Equivalent to Poppler's `dx` argument in `drawChar`, and to the PDF
+    /// spec's Tx formula: `(w0 × Tfs / 1000 + Tc + Tw) × Th` converted to
+    /// device space.
+    ///
+    /// For the last character on a line this falls back to `advance_width`.
+    /// Use this field (not `advance_width`) to detect word boundaries:
+    /// a gap `next.origin_x − (this.origin_x + this.rendered_advance) > threshold`
+    /// reliably identifies inter-word spacing.
+    pub rendered_advance: f32,
 
     /// Full transformation matrix [a, b, c, d, e, f].
     ///
@@ -269,6 +290,7 @@ impl Default for TextChar {
             origin_y: 0.0,
             rotation_degrees: 0.0,
             advance_width: 0.0,
+            rendered_advance: 0.0,
             matrix: Some([1.0, 0.0, 0.0, 1.0, 0.0, 0.0]),
         }
     }
@@ -344,6 +366,7 @@ impl TextChar {
             origin_y: bbox.y,
             rotation_degrees: 0.0,
             advance_width: bbox.width,
+            rendered_advance: bbox.width,
             matrix: None,
         }
     }
@@ -608,6 +631,7 @@ mod tests {
             origin_y: bbox.y,
             rotation_degrees: 0.0,
             advance_width: bbox.width,
+            rendered_advance: bbox.width,
             matrix: None,
         }
     }
@@ -666,6 +690,7 @@ mod tests {
             origin_y: 0.0,
             rotation_degrees: 0.0,
             advance_width: 10.0,
+            rendered_advance: 10.0,
             matrix: None,
         };
         assert!(c.is_monospace);

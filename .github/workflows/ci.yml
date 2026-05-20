@@ -98,10 +98,19 @@ jobs:
   test:
     name: Test
     runs-on: ${{ matrix.os }}
-    # Nightly uses the bundled rust-lld linker, which intermittently crashes
-    # with SIGBUS on resource-constrained runners. Don't let a flaky nightly
-    # linker crash block a release; nightly only exists as an early warning.
-    continue-on-error: ${{ matrix.rust == 'nightly' }}
+    # #522 toolchain-drift policy: `-D warnings` is applied ONLY on the
+    # channel we ship (stable). beta/nightly still build/test/doc, so a
+    # genuine compile/test/doc regression there still hard-fails (the
+    # early warning we want), but a NEW beta/nightly lint can no longer
+    # red `main` with zero code change. No `continue-on-error` for any
+    # channel — a real beta/nightly break must stay visible.
+    # NOTE: this also removes the prior nightly flaky-`rust-lld`-SIGBUS
+    # guard; `CARGO_BUILD_JOBS: "2"` (cargo test step) is the remaining
+    # mitigation. If nightly linker SIGBUS recurs, fix it narrowly
+    # (e.g. pin a non-lld linker on the nightly job) — do NOT
+    # re-blanket-soften warnings.
+    env:
+      RUSTFLAGS: ${{ matrix.rust == 'stable' && '-D warnings' || '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -159,10 +168,13 @@ jobs:
           # job. #399.
           CARGO_BUILD_JOBS: "2"
 
-      - name: Build documentation (warnings as errors)
+      - name: Build documentation (warnings as errors on stable)
         run: cargo doc --no-deps --workspace
         env:
-          RUSTDOCFLAGS: "-D warnings"
+          # #522: deny rustdoc warnings only on stable; beta/nightly
+          # still run `cargo doc` (real doc breakage hard-fails) but a
+          # new beta/nightly rustdoc lint must not red `main`.
+          RUSTDOCFLAGS: ${{ matrix.rust == 'stable' && '-D warnings' || '' }}
 
       # Reclaim disk before the implicit rust-cache save step. The beta
       # ubuntu job has hit "No space left on device" during cache save
@@ -388,7 +400,7 @@ jobs:
         uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
 
       - name: Install uv
-        uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
 
       - name: Create virtual environment
         run: uv venv
@@ -482,7 +494,7 @@ jobs:
 
       # Validate the produced module using wasm-tools.
       - name: Install wasm-tools
-        uses: taiki-e/install-action@c070f87102a1c75b3183910f391c1cb887fe13c8 # v2
+        uses: taiki-e/install-action@213ccc1a076163c093f914550b94feb90fab916d # v2
         with:
           tool: wasm-tools
 
@@ -531,8 +543,24 @@ jobs:
           #     part of that feature, not dead weight — the growth is
           #     legitimate, so the ceiling is raised rather than the
           #     fonts gated off wasm32.
-          # Ceiling leaves ~6% headroom above the 13546 KB v0.3.48 baseline.
-          max_kb=14336
+          #   v0.3.52 ~14.15 MB: the #525 Markdown→PDF styling fix
+          #     adds per-run font dispatch — `parse_inline_runs`, an
+          #     extended `map_font_name` covering all twelve Latin
+          #     Standard-14 faces, and per-run measure/position in
+          #     `render_markdown` — plus on-demand Standard-14
+          #     registration in `PdfWriter::finish` (the latter
+          #     actually shrinks image-only PDFs but the markdown
+          #     pipeline still nets larger). The WASM OCR surface
+          #     stubs (`WasmOcrEngine`, `extract_text_ocr`,
+          #     `model_manifest`) compile in even when `ocr-tract`
+          #     is off, since the `#[cfg(not(...))]` stub bodies and
+          #     wasm-bindgen glue still pay a small cost in the
+          #     default wasm build. Both are legitimate user-facing
+          #     improvements (#525, #524), so the ceiling is raised
+          #     rather than the styling fix gated off wasm32 — same
+          #     precedent the v0.3.48 bump followed.
+          # Ceiling leaves ~6% headroom above the 14489 KB v0.3.52 baseline.
+          max_kb=15360
           if [ "$after_kb" -gt "$max_kb" ]; then
             echo "::error::wasm bundle ${after_kb} KB exceeds ceiling ${max_kb} KB"
             exit 1
@@ -613,7 +641,7 @@ jobs:
       # Upload every lib file that exists — paths vary by OS and target.
       # Downstream jobs download and find the file at its original location.
       - name: Upload native lib artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: native-lib-${{ matrix.os }}-${{ matrix.variant }}
           retention-days: 1
@@ -1128,7 +1156,7 @@ jobs:
 
       - name: Upload coverage to Codecov
         if: always()
-        uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v6
+        uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354 # v6
         with:
           files: ./lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -1200,7 +1228,7 @@ jobs:
         with:
           key: taplo
       - name: Install taplo
-        uses: taiki-e/install-action@c070f87102a1c75b3183910f391c1cb887fe13c8 # v2
+        uses: taiki-e/install-action@213ccc1a076163c093f914550b94feb90fab916d # v2
         with:
           tool: taplo-cli
       - name: Check TOML formatting
@@ -1217,7 +1245,7 @@ jobs:
         with:
           key: shear
       - name: Install cargo-shear
-        uses: taiki-e/install-action@c070f87102a1c75b3183910f391c1cb887fe13c8 # v2
+        uses: taiki-e/install-action@213ccc1a076163c093f914550b94feb90fab916d # v2
         with:
           tool: cargo-shear
       - name: Check for unused dependencies
@@ -1241,7 +1269,7 @@ jobs:
         with:
           key: hack
       - name: Install cargo-hack
-        uses: taiki-e/install-action@c070f87102a1c75b3183910f391c1cb887fe13c8 # v2
+        uses: taiki-e/install-action@213ccc1a076163c093f914550b94feb90fab916d # v2
         with:
           tool: cargo-hack
       - name: Build each feature (singletons + default + all-features)

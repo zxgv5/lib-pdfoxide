@@ -216,7 +216,7 @@ jobs:
 
       - name: Upload .deb artifact
         if: matrix.target == 'x86_64-unknown-linux-gnu'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: debian-package
           path: target/x86_64-unknown-linux-gnu/debian/*.deb
@@ -241,7 +241,7 @@ jobs:
           Compress-Archive -Path @("pdf-oxide.exe", "pdf-oxide-mcp.exe") -DestinationPath ../../../dist/${{ matrix.artifact_name }}-${VERSION}.zip
 
       - name: Upload artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ matrix.artifact_name }}
           path: dist/*
@@ -307,7 +307,7 @@ jobs:
           cp wasm-pkg/README.md wasm-out/
 
       - name: Upload WASM artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: wasm-package
           path: wasm-out/
@@ -400,12 +400,16 @@ jobs:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: ${{ contains(matrix.target, 'aarch64-unknown-linux') && 'aarch64-linux-gnu-gcc' || '' }}
           CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER: ${{ matrix.target == 'x86_64-pc-windows-gnu' && 'x86_64-w64-mingw32-gcc' || '' }}
         run: |
-          # Include all optional features that C#/Node.js/Go bindings expose in
-          # their public API surface. Without these the shipped libs return
-          # _ERR_UNSUPPORTED (8) for rendering, signatures, barcodes, and OCR
-          # calls — phantom APIs that compile but always fail at runtime.
+          # Include all optional features the C#/Node.js/Go bindings expose
+          # in their public API surface, INCLUDING `ocr` (#520 — Node/Go/C#
+          # OCR parity with the Python wheel). Without a feature the shipped
+          # libs return _ERR_UNSUPPORTED (8) for that area — a phantom API
+          # that compiles but always fails at runtime. OCR additionally
+          # needs an ONNX Runtime shared lib + provisioned models at
+          # runtime; the auto surface degrades gracefully to native text
+          # with a typed reason when they are absent (see docs/OCR_GUIDE.md).
           cargo build --release --lib \
-            --features rendering,signatures,barcodes,tsa-client,system-fonts \
+            --features ocr,rendering,signatures,barcodes,tsa-client,system-fonts \
             --target ${{ matrix.target }}
           mkdir -p native-out
           # Shared library (cdylib) — always present
@@ -430,7 +434,7 @@ jobs:
           ls -la native-out/
 
       - name: Upload native lib
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ matrix.artifact_name }}
           path: native-out/
@@ -523,7 +527,7 @@ jobs:
           ls -lh "$OUT/"
 
       - name: Upload go-ffi assets artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: go-ffi-assets
           path: |
@@ -763,7 +767,7 @@ jobs:
           echo "pdf_oxide.node: ${BEFORE} -> ${AFTER} bytes"
 
       - name: Upload .node artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: nodejs-${{ matrix.triple }}
           path: js/build/Release/pdf_oxide.node
@@ -882,7 +886,7 @@ jobs:
             || { echo "AOT smoke test failed"; exit 1; }
 
       - name: Upload NuGet package
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: nuget-package
           path: nuget-out/*.nupkg
@@ -902,13 +906,13 @@ jobs:
           python-version: '3.11'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
 
       - name: Generate type stubs
         run: uvx rylai -o python/pdf_oxide/
 
       - name: Upload type stubs
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: python-type-stubs
           path: python/pdf_oxide/*.pyi
@@ -981,7 +985,7 @@ jobs:
           targets: ${{ matrix.target }}
 
       - name: Install uv
-        uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
 
       - name: Install maturin
         run: uv pip install --system maturin
@@ -1035,7 +1039,7 @@ jobs:
         run: maturin sdist --out dist
 
       - name: Upload wheels
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ matrix.artifact_name }}
           path: dist/*
@@ -1067,7 +1071,7 @@ jobs:
           args: --release --features python --out dist
 
       - name: Upload wheels
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: wheels-linux-${{ matrix.target }}-musl
           path: dist/*
@@ -1138,7 +1142,7 @@ jobs:
           fail_on_unmatched_files: false
 
       - name: Install cargo-cyclonedx
-        uses: taiki-e/install-action@c070f87102a1c75b3183910f391c1cb887fe13c8 # v2
+        uses: taiki-e/install-action@213ccc1a076163c093f914550b94feb90fab916d # v2
         with:
           tool: cargo-cyclonedx
 
@@ -1212,7 +1216,7 @@ jobs:
           ls -lh wheels/
 
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@76f52bc884231f62b9a034ebfe128415bbaabdfc # v1
+        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # v1
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}
           packages-dir: wheels/
@@ -1322,7 +1326,7 @@ jobs:
           cat pdf-oxide.json
 
       - name: Upload packaging artifacts
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: packaging-manifests
           path: |

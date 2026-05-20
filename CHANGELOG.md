@@ -2,6 +2,156 @@
 
 All notable changes to PDFOxide are documented here.
 
+## [0.3.52] - 2026-05-18
+
+> Out-of-the-box OCR for the Node.js, Go and C# prebuilts, a Node
+> worker-teardown fix that silenced a spurious exit warning, an OCR
+> detection-unclip fix that restores recognition on wide text lines
+> (native and WASM bindings alike), a Markdown→PDF styling fix that
+> restores headings, bold/italic and monospace, strict CI
+> toolchain-drift gating, and a dependency-maintenance batch.
+
+### Added
+
+- **OCR in the prebuilt native library for Node.js, Go and C#
+  ([#520](https://github.com/yfedoseev/pdf_oxide/issues/520))** — the
+  `build-native-libs` release job now compiles the shared library with
+  the `ocr` feature (alongside
+  `rendering,signatures,barcodes,tsa-client,system-fonts`), so auto-mode
+  OCR / `extractTextAuto` works straight from the published Node, Go and
+  C# packages with **no `--build-from-source`**. `docs/OCR_GUIDE.md`
+  gains an "OCR Support by Binding" matrix and a pure-npm Node recipe
+  (`npm install pdf-oxide onnxruntime-node`, `ORT_DYLIB_PATH` via
+  `require.resolve(...)`, `prefetchModels` + `extractTextAuto`). The
+  default `pdf-oxide-wasm` still ships without OCR; see the opt-in
+  `wasm-ocr` build below for the experimental WASM OCR path.
+
+- **WASM OCR backend (#524, experimental, opt-in)** — pure-Rust
+  `tract` inference under a new `wasm-ocr` build feature
+  ([`ocr-tract`](https://github.com/yfedoseev/pdf_oxide/issues/524) is
+  the bare backend; `wasm-ml` is retained as a thin back-compat
+  alias). The default `pdf-oxide-wasm` package is **unchanged** and
+  still ships without OCR; only `wasm-ocr` builds include it. The
+  pure-Rust path is **output-equivalent to the native `ort`
+  backend** — verified at the inference-engine level (max abs diff
+  ≤ 3e-6 on the real PaddleOCR det/rec graphs) and end-to-end
+  (byte-identical recognized text on a shared fixture). Cross-target
+  (browser / Deno / edge) integration tests and a release `.wasm`
+  size gate are pending and will land in #524's own dedicated release
+  cycle. See `docs/OCR_GUIDE.md` for the JS fetch+Cache recipe and the
+  build command.
+
+### Fixed
+
+- **OCR: wide text lines were misread (detection unclip bug)
+  ([#524](https://github.com/yfedoseev/pdf_oxide/issues/524))** — the
+  DBNet box-unclip step scaled each corner by a *percent of its own
+  dimension* from the centre instead of PaddleOCR's uniform
+  `area·ratio/perimeter` polygon offset. On a long, short text line
+  that is badly anisotropic: it over-grew the long axis (pushing the
+  box's x origin off-image, negative) and barely grew the short axis
+  (the box stayed ~one glyph-band tall), so the recognizer received a
+  horizontally-shifted, vertically-clipped sliver. A clean single
+  line "OCR fidelity test hello world 2024" came out
+  "OcR tdenfy test neno woridZoZ4 s" (confidence 0.66). Replaced with
+  the standard uniform offset: the same line now reads exactly, at
+  0.98 confidence. Affects the **native** OCR path (all bindings), not
+  just WASM — the two backends are bit-equivalent. Pinned by new
+  postprocessor unit tests and an end-to-end regression guard.
+
+- **Node `prefetchModels()` no longer emits a spurious
+  `Worker N exited with code 1`
+  ([#521](https://github.com/yfedoseev/pdf_oxide/issues/521))** — the
+  `worker_threads` pool is now spawned **lazily** on the first real task
+  (importing the library, or calling the synchronous native APIs such as
+  `extractText*` / `classifyPage` / `prefetchModels`, spawns zero
+  workers); pooled workers are `unref()`'d so an idle pool never keeps
+  the event loop alive; and teardown does an async graceful
+  `terminate()` on `beforeExit` (deliberately **no** `SIGINT`/`SIGTERM`
+  listeners — a library must not change the host's default signal
+  semantics) with a synchronous `terminated` flag flipped on the hard
+  `exit` so a normal process exit killing an unref'd worker is no longer
+  reported as an abnormal exit.
+
+- **Markdown → PDF now renders styling instead of flat body text
+  ([#525](https://github.com/yfedoseev/pdf_oxide/issues/525))** —
+  `Pdf::from_markdown` (and `from_html`, which funnels through it)
+  computed heading sizes but only used them for line spacing, then drew
+  every line in a single regular font, and *stripped* `**bold**` /
+  `*italic*` markers to plain text. Headings (`#`–`####`) now render in
+  the bold face at 2.0/1.5/1.25/1.1× scale; inline `**bold**`,
+  `*italic*` and `` `code` `` produce real per-run font switches
+  (Helvetica-Bold/-Oblique, Courier) measured and positioned so a line
+  stays visually contiguous; fenced code blocks and GFM tables render
+  monospace. Two writer-layer bugs that masked this are also fixed:
+  `map_font_name` discarded explicit Standard-14 weight/oblique names
+  (`Helvetica-Bold` → `Helvetica`) and had no italic path, and the page
+  `/Font` resource set registered only 6 of the 12 Latin Standard-14
+  faces, so any `Tf` to an oblique/bold-serif face resolved to a missing
+  resource and silently fell back to regular. Underscores are no longer
+  treated as emphasis, so `snake_case` identifiers survive intact.
+  Reported by @Jethril.
+
+### CI / Release
+
+- **Strict toolchain-drift gating
+  ([#522](https://github.com/yfedoseev/pdf_oxide/issues/522))** —
+  `RUSTFLAGS=-D warnings` and `RUSTDOCFLAGS=-D warnings` are enforced on
+  the **stable** matrix leg only, and `continue-on-error` has been
+  removed from the beta/nightly legs so upstream-rustc drift surfaces as
+  a real signal instead of being silently swallowed. Residual nightly
+  `rust-lld` SIGBUS risk is mitigated with `CARGO_BUILD_JOBS=2` and
+  documented inline in the workflow.
+- **Dependency maintenance** — quick-xml `0.39 → 0.40`
+  ([#494](https://github.com/yfedoseev/pdf_oxide/issues/494)) with all
+  seven `BytesText::xml_content()` call sites migrated to the
+  behaviour-identical zero-arg `xml11_content()` (0.40 added a
+  `version: XmlVersion` parameter; 0.39's `xml_content()` was literally
+  `self.xml11_content()`, so this is a byte-for-byte no-op);
+  tokenizers `0.22 → 0.23`
+  ([#498](https://github.com/yfedoseev/pdf_oxide/issues/498));
+  weezl `0.1 → 0.2`
+  ([#527](https://github.com/yfedoseev/pdf_oxide/pull/527)) — picks
+  up the upstream LZW-decoder fix for streams that overwrote initial
+  table entries (benefits **pdf_oxide's direct PDF `LZWDecode` filter**
+  in `src/decoders/lzw.rs`; the `image` crate's TIFF reader still pins
+  weezl 0.1 transitively and is unaffected by this bump); aws-lc-rs
+  `1.16.3 → 1.17.0`
+  ([#526](https://github.com/yfedoseev/pdf_oxide/pull/526)) — build-
+  hygiene only (jitterentropy `CFLAGS` filtering for FreeBSD, MinGW
+  Win7 fixes, nightly clippy); and
+  SHA-pinned action bumps `actions/upload-artifact → v7.0.1`
+  ([#495](https://github.com/yfedoseev/pdf_oxide/issues/495)) with
+  `actions/download-artifact → v8.0.1` for compat and
+  `astral-sh/setup-uv → v8.1.0`
+  ([#502](https://github.com/yfedoseev/pdf_oxide/issues/502)), unified
+  across all nine workflows. Additional pinned-action bumps in this
+  release: `pypa/gh-action-pypi-publish → v1.14.0`
+  ([#530](https://github.com/yfedoseev/pdf_oxide/pull/530)) which
+  carries a security fix
+  ([GHSA-vxmw-7h4f-hqxh](https://github.com/pypa/gh-action-pypi-publish/security/advisories/GHSA-vxmw-7h4f-hqxh))
+  for the action that publishes our Python wheel;
+  `github/codeql-action → v4.35.5`
+  ([#528](https://github.com/yfedoseev/pdf_oxide/pull/528));
+  `taiki-e/install-action → v2.79.2`
+  ([#529](https://github.com/yfedoseev/pdf_oxide/pull/529)) — the
+  upstream deprecations (`mdbook-alerts`, `iai-callgrind-runner`) do
+  not affect us (our tool list is `cargo-cyclonedx`, `wasm-tools`,
+  `taplo-cli`, `cargo-shear`); and `codecov/codecov-action → v6.0.1`
+  ([#531](https://github.com/yfedoseev/pdf_oxide/pull/531)).
+  The Dependabot `ort 2.0.0-rc.11 → rc.12`
+  bump ([#496](https://github.com/yfedoseev/pdf_oxide/issues/496)) was
+  **declined** — rc.12 is an upstream regression (missing
+  `SessionOptionsAppendExecutionProvider_VitisAI` on `OrtApi`); the pin
+  is held at `=2.0.0-rc.11`.
+
+### Thanks
+
+- **@Jethril** for reporting
+  [#525](https://github.com/yfedoseev/pdf_oxide/issues/525) — the
+  PDF-from-markdown-has-no-styling bug — with a minimal repro that led
+  directly to the renderer fix.
+
 ## [0.3.51] - 2026-05-17
 
 > Comprehensive auto extraction — per-page text-vs-OCR with typed

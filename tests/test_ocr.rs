@@ -124,7 +124,11 @@ fn test_ocr_config_default() {
     let config = OcrConfig::default();
 
     assert!((config.det_threshold - 0.3).abs() < 0.01);
-    assert!((config.box_threshold - 0.5).abs() < 0.01);
+    // Default `box_threshold` is 0.6 (see src/ocr/config.rs and the
+    // `test_ocr_config_builder` / detector unit tests). This assertion
+    // had been left at the old 0.5 default — a stale pin, unrelated to
+    // the #524 backend work but fixed here so the OCR suite is green.
+    assert!((config.box_threshold - 0.6).abs() < 0.01);
     assert!((config.unclip_ratio - 1.5).abs() < 0.01);
     assert_eq!(config.det_max_side, 960);
     assert_eq!(config.rec_target_height, 48);
@@ -410,4 +414,52 @@ fn test_extract_text_with_ocr_auto() {
     )
     .expect("Failed to extract text with OCR");
     assert!(!ocr_text.is_empty());
+}
+
+/// #524 task 8 regression guard. The detection unclip used a
+/// percent-of-dimension scale instead of PaddleOCR's uniform
+/// `area*ratio/perimeter` offset; on a wide text line that left the
+/// box ~one glyph-band tall and shoved x off-image, so the recogniser
+/// got a clipped sliver and "OCR fidelity test hello world 2024" came
+/// out "OcR tdenfy test neno woridZoZ4 s". This pins the full pipeline
+/// on that exact fixture to the correct text. Affected native + wasm
+/// equally (engines are bit-equivalent — see backend.rs `parity`).
+///
+/// Run: ORT_DYLIB_PATH=/path/libonnxruntime.so PDF_OXIDE_MODEL_DIR=/models \
+///   cargo test --features ocr --test test_ocr -- --ignored unclip_regression
+#[test]
+#[ignore = "needs PDF_OXIDE_MODEL_DIR models + ORT_DYLIB_PATH"]
+fn unclip_regression_clean_line_is_read_exactly() {
+    use pdf_oxide::{
+        ocr::{OcrConfig, OcrEngine},
+        PdfDocument,
+    };
+
+    let md = std::env::var("PDF_OXIDE_MODEL_DIR")
+        .unwrap_or_else(|_| format!("{}/.cache/pdf_oxide/models", std::env::var("HOME").unwrap()));
+    let engine = OcrEngine::new(
+        format!("{md}/det.onnx"),
+        format!("{md}/rec.onnx"),
+        format!("{md}/en_dict.txt"),
+        OcrConfig::default(),
+    )
+    .expect("OCR engine");
+
+    let doc = PdfDocument::open("tests/fixtures/ocr/auto_image_text_en.pdf").expect("fixture");
+    let img = doc
+        .extract_images(0)
+        .expect("images")
+        .iter()
+        .max_by_key(|i| (i.width() as u64) * (i.height() as u64))
+        .expect("an image")
+        .to_dynamic_image()
+        .expect("decode");
+
+    let out = engine.ocr_image(&img).expect("ocr");
+    let text = out.text_in_reading_order();
+    assert_eq!(
+        text, "OCR fidelity test hello world 2024",
+        "clean single line misread (unclip regression?): {text:?}"
+    );
+    assert!(out.total_confidence > 0.9, "confidence regressed: {}", out.total_confidence);
 }

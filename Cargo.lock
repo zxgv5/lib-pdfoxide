@@ -375,9 +375,9 @@ dependencies = [
 
 [[package]]
 name = "aws-lc-rs"
-version = "1.16.3"
+version = "1.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ec6fb3fe69024a75fa7e1bfb48aa6cf59706a101658ea01bfd33b2b248a038f"
+checksum = "5ec2f1fc3ec205783a5da9a7e6c1509cc69dedf09a1949e412c1e18469326d00"
 dependencies = [
  "aws-lc-fips-sys",
  "aws-lc-sys",
@@ -387,9 +387,9 @@ dependencies = [
 
 [[package]]
 name = "aws-lc-sys"
-version = "0.40.0"
+version = "0.41.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f50037ee5e1e41e7b8f9d161680a725bd1626cb6f8c7e901f91f942850852fe7"
+checksum = "1a2f9779ce85b93ab6170dd940ad0169b5766ff848247aff13bb788b832fe3f4"
 dependencies = [
  "cc",
  "cmake",
@@ -1026,6 +1026,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "daachorse"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6f55d7153ba3b507595872a3874803f07a8a81d1e888abed8e5db7da0597d6e2"
+
+[[package]]
 name = "darling"
 version = "0.20.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1609,7 +1615,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ee8cfcc411d9adbbaba82fb72661cc1bcca13e8bba98b364e62b2dba8f960159"
 dependencies = [
  "color_quant",
- "weezl",
+ "weezl 0.1.12",
 ]
 
 [[package]]
@@ -2775,7 +2781,7 @@ dependencies = [
  "fast-float2",
  "libc",
  "log",
- "quick-xml 0.40.0",
+ "quick-xml",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
@@ -2969,7 +2975,7 @@ dependencies = [
 
 [[package]]
 name = "pdf_oxide"
-version = "0.3.51"
+version = "0.3.52"
 dependencies = [
  "aes 0.9.0",
  "aws-lc-rs",
@@ -2995,6 +3001,7 @@ dependencies = [
  "flate2",
  "fontdb",
  "getrandom 0.2.17",
+ "getrandom 0.3.4",
  "getrandom 0.4.2",
  "hayro-jbig2",
  "hex-literal",
@@ -3023,7 +3030,7 @@ dependencies = [
  "pyo3-log",
  "qcms",
  "qrcode",
- "quick-xml 0.39.3",
+ "quick-xml",
  "rayon",
  "regex",
  "rsa",
@@ -3053,14 +3060,14 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-test",
  "web-sys",
- "weezl",
+ "weezl 0.2.1",
  "x509-parser",
  "x509-tsp",
 ]
 
 [[package]]
 name = "pdf_oxide_cli"
-version = "0.3.51"
+version = "0.3.52"
 dependencies = [
  "clap",
  "is-terminal",
@@ -3070,7 +3077,7 @@ dependencies = [
 
 [[package]]
 name = "pdf_oxide_mcp"
-version = "0.3.51"
+version = "0.3.52"
 dependencies = [
  "pdf_oxide",
  "serde_json",
@@ -3552,15 +3559,6 @@ name = "quick-error"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a993555f31e5a609f617c12db6250dedcac1b0a85076912c436e6fc9b2c8e6a3"
-
-[[package]]
-name = "quick-xml"
-version = "0.39.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "721da970c312655cde9b4ffe0547f20a8494866a4af5ff51f18b7c633d0c870b"
-dependencies = [
- "memchr",
-]
 
 [[package]]
 name = "quick-xml"
@@ -4531,7 +4529,7 @@ dependencies = [
  "flate2",
  "half",
  "quick-error",
- "weezl",
+ "weezl 0.1.12",
  "zune-jpeg",
 ]
 
@@ -4619,13 +4617,13 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "tokenizers"
-version = "0.22.2"
+version = "0.23.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b238e22d44a15349529690fb07bd645cf58149a1b1e44d6cb5bd1641ff1a6223"
+checksum = "44e5bea67576e04b6ff8564c5d9e09c2ef0cf476502245f2f120e497769d3112"
 dependencies = [
  "ahash",
- "aho-corasick",
  "compact_str",
+ "daachorse",
  "dary_heap",
  "derive_builder",
  "esaxx-rs",
@@ -5211,6 +5209,12 @@ name = "weezl"
 version = "0.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a28ac98ddc8b9274cb41bb4d9d4d5c425b6020c50c46f25559911905610b4a88"
+
+[[package]]
+name = "weezl"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d4ca08e5ef825b65b056d9efbd95c8750683f0a6d0466d02e96dc2e4e360f3d2"
 
 [[package]]
 name = "wide"

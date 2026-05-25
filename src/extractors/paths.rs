@@ -157,6 +157,15 @@ pub struct PathExtractor {
     max_xobject_depth: usize,
     /// Cached XObject name → ObjectRef mapping, built on first lookup.
     cached_xobject_dict: Option<std::collections::HashMap<String, crate::object::ObjectRef>>,
+    /// Stack of active Optional Content Group (PDF "layer") names. Each
+    /// `BDC` operator (any tag) pushes an entry — `Some(layer_name)` when
+    /// the tag is `/OC` and the property dict resolves to a named OCG,
+    /// `None` for non-`/OC` marked content or unresolvable OCG names.
+    /// Every `EMC` pops one entry. Always-balanced so the depth tracks
+    /// the active marked-content nesting precisely; the *top* `Some(_)`
+    /// in the stack is the layer name attached to paths finalized while
+    /// inside this region (ISO 32000-1:2008 §8.11, §14.6).
+    oc_layer_stack: Vec<Option<String>>,
 }
 
 impl PathExtractor {
@@ -178,7 +187,33 @@ impl PathExtractor {
             processed_xobjects: std::collections::HashSet::new(),
             max_xobject_depth: 100,
             cached_xobject_dict: None,
+            oc_layer_stack: Vec::new(),
         }
+    }
+
+    /// Push an entry onto the marked-content layer stack.
+    ///
+    /// Pass `Some(name)` for `BDC /OC <<...>>` (or `BDC /OC /MC0`) where
+    /// the property dict resolves to a named Optional Content Group. Pass
+    /// `None` for any other `BDC`/`BMC` (e.g. `BDC /Span <<...>>`,
+    /// `BDC /Artifact`) so the stack stays balanced and outer OCG context
+    /// continues to apply to nested non-OC content.
+    pub fn push_oc_layer(&mut self, layer: Option<String>) {
+        self.oc_layer_stack.push(layer);
+    }
+
+    /// Pop the most recently pushed marked-content entry (called on `EMC`).
+    /// No-op if the stack is empty — keeps extraction robust against PDFs
+    /// with unbalanced markers.
+    pub fn pop_oc_layer(&mut self) {
+        self.oc_layer_stack.pop();
+    }
+
+    /// Return the innermost `Some(layer)` on the marked-content stack, or
+    /// `None` if no `/OC` region is currently active. Non-OC `BDC` entries
+    /// (`None` slots) are transparent: they do not shadow an outer OCG.
+    fn current_layer(&self) -> Option<String> {
+        self.oc_layer_stack.iter().rev().find_map(|e| e.clone())
     }
 
     /// Set the page resources for XObject resolution (Issue #40).
@@ -577,6 +612,10 @@ impl PathExtractor {
         } else {
             path.fill_color = None;
         }
+
+        // Attach the active Optional Content Group (PDF "layer") name, if
+        // the path was emitted inside a `BDC /OC … EMC` region.
+        path.layer = self.current_layer();
 
         self.paths.push(path);
 

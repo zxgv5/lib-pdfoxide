@@ -9854,12 +9854,108 @@ impl PdfDocument {
                     }
                 },
 
+                // Marked content operators — maintain the active Optional
+                // Content Group (PDF "layer") so each finalized path gets
+                // tagged with the OCG it was emitted under. Per ISO 32000-1
+                // §14.6, every `BDC`/`BMC` must be balanced by an `EMC`,
+                // so we always push (with `None` for non-`/OC` tags) and
+                // always pop — keeps the stack depth in sync with the
+                // marked-content nesting.
+                Operator::BeginMarkedContent { .. } => {
+                    extractor.push_oc_layer(None);
+                },
+                Operator::BeginMarkedContentDict { tag, properties } => {
+                    let layer = if tag == "OC" {
+                        self.resolve_oc_layer_name(page_dict, &properties)
+                    } else {
+                        None
+                    };
+                    extractor.push_oc_layer(layer);
+                },
+                Operator::EndMarkedContent => {
+                    extractor.pop_oc_layer();
+                },
+
                 // Skip other operators (text, images, etc.)
                 _ => {},
             }
         }
 
         Ok(extractor.finish())
+    }
+
+    /// Resolve a `BDC /OC <properties>` property operand to the human-readable
+    /// `/Name` of the Optional Content Group it refers to (PDF spec
+    /// ISO 32000-1:2008 §8.11, §14.6).
+    ///
+    /// `properties` is the operand parsed by `Operator::BeginMarkedContentDict`
+    /// — per spec it is either:
+    ///
+    /// 1. An inline dictionary: read its `/Name` entry directly.
+    /// 2. A name (e.g. `/MC0`) that references `page_dict /Resources
+    ///    /Properties <name>` → an indirect ref to an OCG dictionary → read
+    ///    its `/Name` entry.
+    ///
+    /// Returns `None` for malformed PDFs, missing `/Resources /Properties`
+    /// entries, or OCG objects without a `/Name`. Callers treat `None` as
+    /// "path belongs to no named layer" — extraction continues normally.
+    fn resolve_oc_layer_name(
+        &self,
+        page_dict: &std::collections::HashMap<String, crate::object::Object>,
+        properties: &crate::object::Object,
+    ) -> Option<String> {
+        use crate::object::Object;
+
+        // Helper to pull a UTF-8 `/Name` (decoded as a PDF text string) out
+        // of an OCG-like dictionary. OCG `/Name` is a string (§8.11.2.1),
+        // not a `/Name` PDF name.
+        fn read_name_field(dict: &std::collections::HashMap<String, Object>) -> Option<String> {
+            let name_obj = dict.get("Name")?;
+            match name_obj {
+                Object::String(bytes) => {
+                    // PDF spec: text strings may be PDFDocEncoding or UTF-16BE
+                    // with BOM. Detect BOM; otherwise treat as latin-1.
+                    if bytes.starts_with(&[0xFE, 0xFF]) {
+                        let u16s: Vec<u16> = bytes[2..]
+                            .chunks_exact(2)
+                            .map(|c| u16::from_be_bytes([c[0], c[1]]))
+                            .collect();
+                        String::from_utf16(&u16s).ok()
+                    } else {
+                        Some(bytes.iter().map(|&b| b as char).collect())
+                    }
+                },
+                Object::Name(s) => Some(s.clone()),
+                _ => None,
+            }
+        }
+
+        // Case 1: inline dictionary — read /Name directly.
+        if let Some(dict) = properties.as_dict() {
+            return read_name_field(dict);
+        }
+
+        // Case 2: name reference — look up page /Resources /Properties.
+        let prop_name = properties.as_name()?;
+        let resources = page_dict.get("Resources")?;
+        let resources_obj = if let Some(r) = resources.as_reference() {
+            self.load_object(r).ok()?
+        } else {
+            resources.clone()
+        };
+        let properties_dict = resources_obj.as_dict()?.get("Properties")?;
+        let properties_obj = if let Some(r) = properties_dict.as_reference() {
+            self.load_object(r).ok()?
+        } else {
+            properties_dict.clone()
+        };
+        let target = properties_obj.as_dict()?.get(prop_name)?;
+        let target_obj = if let Some(r) = target.as_reference() {
+            self.load_object(r).ok()?
+        } else {
+            target.clone()
+        };
+        read_name_field(target_obj.as_dict()?)
     }
 
     /// Extract rectangles from a page (v0.3.14).

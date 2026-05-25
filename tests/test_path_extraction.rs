@@ -199,6 +199,7 @@ mod svg_conversion_tests {
             matrix: None,
             artifact_type: None,
             reading_order: None,
+            layer: None,
         }
     }
 
@@ -264,6 +265,7 @@ mod svg_conversion_tests {
             matrix: None,
             artifact_type: None,
             reading_order: None,
+            layer: None,
         };
 
         // Generate curve path data
@@ -296,6 +298,7 @@ mod svg_conversion_tests {
             matrix: None,
             artifact_type: None,
             reading_order: None,
+            layer: None,
         };
 
         // Rectangle should be converted to M L L L Z
@@ -323,6 +326,7 @@ mod svg_conversion_tests {
             matrix: None,
             artifact_type: None,
             reading_order: None,
+            layer: None,
         };
 
         assert_eq!(round_cap.line_cap, LineCap::Round);
@@ -346,6 +350,7 @@ mod svg_conversion_tests {
             matrix: None,
             artifact_type: None,
             reading_order: None,
+            layer: None,
         };
 
         assert_eq!(bevel_join.line_join, LineJoin::Bevel);

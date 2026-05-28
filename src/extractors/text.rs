@@ -2673,6 +2673,73 @@ impl<'doc> TextExtractor<'doc> {
         false
     }
 
+    /// Check whether a BDC properties dict represents an excluded OCG or OCMD.
+    ///
+    /// Handles two cases per ISO 32000-1 Section 8.11.2:
+    /// - Direct OCG: dict has `/Name` -> check against excluded layers
+    /// - OCMD: dict has `/Type /OCMD` and `/OCGs` array -> resolve each
+    ///   referenced OCG and check its `/Name` against excluded layers
+    fn check_ocg_excluded(&self, props_dict: &std::collections::HashMap<String, Object>) -> bool {
+        if let Some(ocg_name) = props_dict.get("Name") {
+            return self.ocg_name_is_excluded(ocg_name);
+        }
+
+        if let Some(Object::Name(t)) = props_dict.get("Type") {
+            if t == "OCMD" {
+                if let Some(ocgs_obj) = props_dict.get("OCGs") {
+                    return self.ocmd_ocgs_excluded(ocgs_obj);
+                }
+            }
+        }
+
+        false
+    }
+
+    fn ocg_name_is_excluded(&self, name_obj: &Object) -> bool {
+        if let Some(name_str) = name_obj.as_name() {
+            return self.excluded_layers.contains(name_str);
+        }
+        if let Some(name_bytes) = name_obj.as_string() {
+            let name_str = Self::decode_pdf_text_string(name_bytes);
+            return self.excluded_layers.contains(&name_str);
+        }
+        false
+    }
+
+    /// Resolve OCMD /OCGs and check if any referenced OCG is excluded.
+    /// /OCGs can be a single reference or an array of references.
+    fn ocmd_ocgs_excluded(&self, ocgs_obj: &Object) -> bool {
+        let doc = match self.document {
+            Some(d) => d,
+            None => return false,
+        };
+
+        let refs: Vec<&Object> = if let Some(arr) = ocgs_obj.as_array() {
+            arr.iter().collect()
+        } else {
+            vec![ocgs_obj]
+        };
+
+        for obj in refs {
+            let resolved = if let Some(r) = obj.as_reference() {
+                match doc.load_object(r) {
+                    Ok(o) => o,
+                    Err(_) => continue,
+                }
+            } else {
+                obj.clone()
+            };
+            if let Some(d) = resolved.as_dict() {
+                if let Some(name_obj) = d.get("Name") {
+                    if self.ocg_name_is_excluded(name_obj) {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
     /// Get current ActualText from marked content stack (PDF Spec Section 14.9.4).
     ///
     /// Searches from the innermost marked content context outward, returning
@@ -5081,25 +5148,12 @@ impl<'doc> TextExtractor<'doc> {
                         artifact_type = Self::parse_artifact_type(&props_dict);
                     }
 
-                    // OCG (Optional Content Group / layer) filtering.
-                    // Per ISO 32000-1:2008 Section 8.11.2, content within a BDC
-                    // tagged "OC" references an OCG dictionary with /Type /OCG
-                    // and /Name <layer-name>.
+                    // OCG / OCMD (Optional Content) filtering.
+                    // Per ISO 32000-1:2008 Section 8.11.2:
+                    //  - Direct OCG: << /Type /OCG /Name /LayerName >>
+                    //  - OCMD:       << /Type /OCMD /OCGs [refs...] /P /policy >>
                     if tag == "OC" && !self.excluded_layers.is_empty() {
-                        if let Some(ocg_name) = props_dict.get("Name") {
-                            if let Some(name_str) = ocg_name.as_name() {
-                                if self.excluded_layers.contains(name_str) {
-                                    is_excluded_layer = true;
-                                    log::debug!("Entering excluded OCG layer: {:?}", name_str);
-                                }
-                            } else if let Some(name_bytes) = ocg_name.as_string() {
-                                let name_str = Self::decode_pdf_text_string(name_bytes);
-                                if self.excluded_layers.contains(&name_str) {
-                                    is_excluded_layer = true;
-                                    log::debug!("Entering excluded OCG layer: {:?}", name_str);
-                                }
-                            }
-                        }
+                        is_excluded_layer = self.check_ocg_excluded(&props_dict);
                     }
                 }
 

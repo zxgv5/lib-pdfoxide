@@ -642,3 +642,94 @@ fn test_empty_filters_fall_through_to_normal_extraction() {
         "Empty filters should produce identical output to unfiltered extraction"
     );
 }
+
+// ============================================================================
+// Task 2: OCMD (Optional Content Membership Dictionary) support
+// ============================================================================
+
+fn build_pdf_with_ocmd() -> Vec<u8> {
+    let mut pdf = Vec::new();
+    let mut offsets: Vec<usize> = Vec::new();
+
+    pdf.extend_from_slice(b"%PDF-1.4\n");
+
+    offsets.push(pdf.len());
+    pdf.extend_from_slice(
+        b"1 0 obj\n<< /Type /Catalog /Pages 2 0 R\n\
+           /OCProperties << /OCGs [7 0 R] /D << /ON [7 0 R] >> >> >>\nendobj\n\n",
+    );
+    offsets.push(pdf.len());
+    pdf.extend_from_slice(b"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n\n");
+    offsets.push(pdf.len());
+    pdf.extend_from_slice(
+        b"3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792]\n\
+           /Contents 4 0 R\n\
+           /Resources << /Font << /F1 5 0 R >> /Properties << /MC0 6 0 R >> >> >>\nendobj\n\n",
+    );
+    let content = b"BT /F1 12 Tf 50 700 Td (ALWAYS) Tj ET /OC /MC0 BDC BT /F1 12 Tf 50 650 Td (MEMBER) Tj ET EMC";
+    offsets.push(pdf.len());
+    let hdr = format!("4 0 obj\n<< /Length {} >>\nstream\n", content.len());
+    pdf.extend_from_slice(hdr.as_bytes());
+    pdf.extend_from_slice(content);
+    pdf.extend_from_slice(b"\nendstream\nendobj\n\n");
+    offsets.push(pdf.len());
+    pdf.extend_from_slice(
+        b"5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica\n\
+           /Encoding /WinAnsiEncoding >>\nendobj\n\n",
+    );
+    // Obj 6: OCMD referencing OCG
+    offsets.push(pdf.len());
+    pdf.extend_from_slice(
+        b"6 0 obj\n<< /Type /OCMD /OCGs [7 0 R] /P /AllOn >>\nendobj\n\n",
+    );
+    // Obj 7: OCG
+    offsets.push(pdf.len());
+    pdf.extend_from_slice(b"7 0 obj\n<< /Type /OCG /Name /MemberLayer >>\nendobj\n\n");
+
+    let xref_offset = pdf.len();
+    let n_obj = offsets.len() + 1;
+    let mut xref = format!("xref\n0 {}\n", n_obj);
+    xref.push_str("0000000000 65535 f \n");
+    for off in &offsets {
+        xref.push_str(&format!("{:010} 00000 n \n", off));
+    }
+    pdf.extend_from_slice(xref.as_bytes());
+    let trailer = format!(
+        "trailer\n<< /Size {} /Root 1 0 R >>\nstartxref\n{}\n%%EOF\n",
+        n_obj, xref_offset
+    );
+    pdf.extend_from_slice(trailer.as_bytes());
+    pdf
+}
+
+#[test]
+fn test_ocmd_layer_filtering() {
+    let pdf_bytes = build_pdf_with_ocmd();
+    let doc = PdfDocument::from_bytes(pdf_bytes).expect("parse PDF");
+
+    let layers = doc.get_layers().expect("get_layers");
+    assert!(
+        layers.contains(&"MemberLayer".to_string()),
+        "got: {:?}",
+        layers
+    );
+
+    let text_all = doc.extract_text(0).expect("unfiltered");
+    assert!(text_all.contains("ALWAYS"), "got: {:?}", text_all);
+    assert!(text_all.contains("MEMBER"), "got: {:?}", text_all);
+
+    let excluded = HashSet::from(["MemberLayer".to_string()]);
+    let text_filtered = doc
+        .extract_text_filtered(0, excluded, HashSet::new())
+        .expect("filtered");
+    assert!(
+        text_filtered.contains("ALWAYS"),
+        "got: {:?}",
+        text_filtered
+    );
+    assert!(
+        !text_filtered.contains("MEMBER"),
+        "MEMBER should be excluded via OCMD resolution, got: {:?}",
+        text_filtered
+    );
+}

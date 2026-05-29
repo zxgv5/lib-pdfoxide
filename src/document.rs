@@ -9519,7 +9519,7 @@ impl PdfDocument {
 
     /// Extract text from a region of a page with layer/ink filtering applied.
     ///
-    /// Composes [`extract_text_filtered`] with [`extract_text_in_rect`]: spans
+    /// Composes [`Self::extract_text_filtered`] with [`Self::extract_text_in_rect`]: spans
     /// are filtered by layer/ink first, then by region, then assembled via
     /// the full text pipeline (structure-tree ordering, table detection,
     /// column detection, whitespace + line breaks).

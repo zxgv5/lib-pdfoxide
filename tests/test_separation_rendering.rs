@@ -1001,7 +1001,7 @@ mod tests {
         let bw = black.width as usize;
         let center = black.data[(50 * bw) + 50];
         assert!(
-            center >= 100 && center <= 140,
+            (100..=140).contains(&center),
             "Black plate at overlap should retain ~50% tint under overprinted spot, got {}",
             center
         );
@@ -1374,7 +1374,7 @@ mod tests {
         // Real DeviceN inline images carry one sample per ink-name per pixel.
         let mut content: Vec<u8> = Vec::new();
         content.extend_from_slice(b"/CS1 cs\nBI /W 10 /H 10 /BPC 8 /CS /DeviceGray ID\n");
-        content.extend(std::iter::repeat(0xFFu8).take(100));
+        content.extend(std::iter::repeat_n(0xFFu8, 100));
         content.extend_from_slice(b"\nEI\n");
 
         // Assemble PDF bytes directly to keep the binary inline image intact.

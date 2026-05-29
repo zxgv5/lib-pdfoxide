@@ -239,7 +239,7 @@ pub struct TextChar {
     /// This is the advance for the glyph shape only — it does **not** include
     /// character spacing (Tc), word spacing (Tw), or TJ array adjustments.
     /// For word-boundary detection and the full cursor advance including all
-    /// spacing, use [`rendered_advance`].
+    /// spacing, use [`Self::rendered_advance`].
     pub advance_width: f32,
 
     /// Actual rendered advance to the next character's origin (device space).

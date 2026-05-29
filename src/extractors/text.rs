@@ -3365,6 +3365,29 @@ impl<'doc> TextExtractor<'doc> {
             .map(|s| (s.bbox.x, s.bbox.y, s.bbox.width, s.font_size))
             .collect();
 
+        // A valid base candidate `j` always has `y_offset = sy - by` in
+        // `[0, bfs*0.5]` (see the gates below), so `by` lies in
+        // `[sy - bfs*0.5, sy] ⊆ [sy - max_fs*0.5, sy]`. Sort span indices by
+        // Y once and, per candidate, binary-search that Y-window instead of
+        // rescanning all spans — this turns the previous O(n²) double loop
+        // (which hung for >30 s on archive.org / Google-Books pages whose
+        // invisible hOCR layer emits thousands of spans, #575) into roughly
+        // O(n log n + n·window). The window is a strict superset of the
+        // acceptable bases, so the result is identical to the full scan.
+        let max_fs = snapshot
+            .iter()
+            .map(|s| s.3)
+            .fold(0.0f32, f32::max);
+        let max_half_em = max_fs * 0.5;
+        let mut by_order: Vec<usize> = (0..n).collect();
+        by_order.sort_by(|&a, &b| {
+            snapshot[a]
+                .1
+                .partial_cmp(&snapshot[b].1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        let ys_sorted: Vec<f32> = by_order.iter().map(|&idx| snapshot[idx].1).collect();
+
         for i in 0..n {
             let (sx, sy, _sw, sfs) = snapshot[i];
             if sfs <= 0.0 {
@@ -3376,7 +3399,11 @@ impl<'doc> TextExtractor<'doc> {
             // lines snaps onto the nearer one.
             let mut best_base_y: Option<f32> = None;
             let mut best_abs_offset = f32::MAX;
-            for j in 0..n {
+            // Candidates have `by ∈ [sy - max_half_em, sy]`; restrict the scan
+            // to that contiguous slice of the Y-sorted index.
+            let lo = ys_sorted.partition_point(|&y| y < sy - max_half_em);
+            let hi = ys_sorted.partition_point(|&y| y <= sy);
+            for &j in &by_order[lo..hi] {
                 if i == j {
                     continue;
                 }
@@ -8963,6 +8990,83 @@ mod tests {
         // Font size ratio alone (without bbox) - prev is superscript
         let result = is_citation_context(None, None, 12.0, 7.2, 12.0);
         assert!(result, "Should detect citation from font size ratio alone");
+    }
+
+    // #575: snap_superscript_baselines was O(n²) (every span scanned against
+    // every other), hanging >30 s on archive.org/Google-Books pages whose
+    // invisible hOCR layer emits tens of thousands of spans. The Y-windowed
+    // rewrite must (a) still snap a superscript onto its base and (b) scale —
+    // 50k spans take ~10-20 s under the old double loop but milliseconds now,
+    // so a generous wall-clock bound catches a quadratic regression without
+    // being flaky.
+    fn snap_span(text: &str, x: f32, y: f32, w: f32, fs: f32, seq: usize) -> TextSpan {
+        TextSpan {
+            artifact_type: None,
+            text: text.to_string(),
+            bbox: Rect::new(x, y, w, fs),
+            font_name: "F1".to_string(),
+            font_size: fs,
+            font_weight: FontWeight::Normal,
+            color: Color::black(),
+            mcid: None,
+            sequence: seq,
+            split_boundary_before: false,
+            offset_semantic: false,
+            is_italic: false,
+            is_monospace: false,
+            char_spacing: 0.0,
+            word_spacing: 0.0,
+            horizontal_scaling: 100.0,
+            primary_detected: false,
+            char_widths: vec![],
+            heading_level: None,
+        }
+    }
+
+    #[test]
+    fn test_snap_superscript_baselines_correctness() {
+        let mut extractor = TextExtractor::new();
+        // Base: 12pt body glyph at y=700, right edge x=130.
+        // Superscript: 6pt glyph just above-right (y=704, x=130).
+        extractor.spans = vec![
+            snap_span("x", 100.0, 700.0, 30.0, 12.0, 0),
+            snap_span("2", 130.0, 704.0, 4.0, 6.0, 1),
+        ];
+        extractor.snap_superscript_baselines();
+        assert_eq!(
+            extractor.spans[1].bbox.y, 700.0,
+            "#575: superscript must snap onto the base baseline (y=700)"
+        );
+    }
+
+    #[test]
+    fn test_snap_superscript_baselines_scales() {
+        let mut extractor = TextExtractor::new();
+        let mut spans = Vec::with_capacity(50_002);
+        // A real base+superscript pair we can assert on.
+        spans.push(snap_span("x", 100.0, 700.0, 30.0, 12.0, 0));
+        spans.push(snap_span("2", 130.0, 704.0, 4.0, 6.0, 1));
+        // 50k body spans spread across the page (distinct Y) — same font size,
+        // so none qualify as bases for each other; the cost is pure iteration.
+        for k in 0..50_000usize {
+            let y = (k as f32) * 2.0; // spread across Y so each window is tiny
+            spans.push(snap_span("a", 50.0, y, 6.0, 10.0, k + 2));
+        }
+        extractor.spans = spans;
+
+        let start = std::time::Instant::now();
+        extractor.snap_superscript_baselines();
+        let elapsed = start.elapsed();
+
+        assert!(
+            elapsed.as_secs() < 5,
+            "#575: snap_superscript_baselines took {elapsed:?} on 50k spans — \
+             likely an O(n²) regression"
+        );
+        assert_eq!(
+            extractor.spans[1].bbox.y, 700.0,
+            "#575: the genuine superscript must still snap to its base"
+        );
     }
 
     // ========================================================================

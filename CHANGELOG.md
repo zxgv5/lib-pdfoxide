@@ -2,7 +2,7 @@
 
 All notable changes to PDFOxide are documented here.
 
-## [0.3.57] - 2026-05-29
+## [0.3.57] - 2026-05-30
 
 > Community contributions + extraction-quality sweep — separation plates, OCG ink filtering, two-phase images, rendered-advance metrics, plus multi-column reading order, page-rotation, CJK/UTF-8 CMap decoding, RTL logical order, indirect-ref page boxes, and font-cache correctness
 

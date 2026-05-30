@@ -2467,7 +2467,11 @@ pub(crate) fn image_handle_from_xobject<'doc>(
         .and_then(|cs| parse_color_space(cs).ok())
         .unwrap_or(ColorSpace::DeviceRGB);
 
-    // Resolve Indexed base cs when it is an indirect reference
+    // For an `[/Indexed base hival lookup]` color space (§8.6.6.3), report the
+    // base color space in the handle (the de-indexed output space). Only the
+    // direct-array form is handled here; an indirect `/ColorSpace` reference to
+    // an Indexed array keeps the `Indexed` tag. (Resource-name and indirect-ref
+    // resolution for the handle metadata is a follow-up — see decode() notes.)
     let color_space = if matches!(&color_space, ColorSpace::Indexed) {
         if let Some(Object::Array(arr)) = xobject_dict.get("ColorSpace") {
             if arr.len() >= 2 {

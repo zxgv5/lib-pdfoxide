@@ -161,12 +161,13 @@ fn type3_fontmatrix_advance_width_scaled_correctly() {
     let doc = PdfDocument::open(tmp.path()).expect("open");
     let chars = doc.extract_chars(0).expect("extract_chars");
 
-    let ch = chars.iter().find(|c| c.char == 'A');
-    if ch.is_none() {
-        // CharProc uses d0 (width-only) — char may not extract as visible output.
-        return;
-    }
-    let ch = ch.unwrap();
+    // The CharProc paints `(A)`, so the glyph must extract. Assert rather than
+    // silently returning, so a width-scaling regression can't hide behind a
+    // no-op test.
+    let ch = chars
+        .iter()
+        .find(|c| c.char == 'A')
+        .expect("Type3 glyph 'A' should extract from the constructed CharProc");
 
     // Fixed:  advance_width ≈ 5.0 × (10.0 × 0.2) = 10.0
     // Broken: advance_width ≈ 5.0 × (10.0 / 1000.0) = 0.05
@@ -198,12 +199,12 @@ fn type3_identity_fontmatrix_default_width_not_overscaled() {
     let doc = PdfDocument::open(tmp.path()).expect("open");
     let chars = doc.extract_chars(0).expect("extract_chars");
 
-    let ch = chars.iter().find(|c| c.char == 'A');
-    if ch.is_none() {
-        // CharProc uses d0 (width-only) — char may not extract as visible output.
-        return;
-    }
-    let ch = ch.unwrap();
+    // Assert the glyph extracts (rather than silently returning) so a
+    // default-width over-scaling regression can't pass vacuously.
+    let ch = chars
+        .iter()
+        .find(|c| c.char == 'A')
+        .expect("Type3 glyph 'A' should extract from the constructed CharProc");
 
     assert!(
         ch.advance_width < 100.0,
@@ -214,6 +215,37 @@ fn type3_identity_fontmatrix_default_width_not_overscaled() {
     assert!(
         ch.advance_width > 0.1,
         "Type3 default advance_width ({:.4}) should be positive",
+        ch.advance_width
+    );
+}
+
+/// A malformed `/FontMatrix [0 0 0 0 0 0]` (degenerate zero horizontal scale,
+/// ISO 32000-1 §9.2.4 / §9.6.5) must NOT yield an `inf`/`NaN` advance via the
+/// `default_width * 0.001 / font_matrix_a` rescale — `font_matrix_a` falls back
+/// to the standard 0.001 (Type 1) scale, so the advance stays finite and sane.
+#[test]
+fn type3_degenerate_zero_fontmatrix_falls_back_safely() {
+    let pdf = type3_pdf_no_widths_array(0.0, 10.0);
+
+    let tmp = tempfile::NamedTempFile::new().expect("temp");
+    std::fs::write(tmp.path(), &pdf).unwrap();
+
+    let doc = PdfDocument::open(tmp.path()).expect("open");
+    let chars = doc.extract_chars(0).expect("extract_chars");
+
+    let ch = chars
+        .iter()
+        .find(|c| c.char == 'A')
+        .expect("Type3 glyph 'A' should extract even with a degenerate FontMatrix");
+
+    assert!(
+        ch.advance_width.is_finite(),
+        "degenerate FontMatrix[0]=0 must not produce inf/NaN advance (got {})",
+        ch.advance_width
+    );
+    assert!(
+        ch.advance_width > 0.0 && ch.advance_width < 1000.0,
+        "degenerate FontMatrix should fall back to a sane advance (~5.5), got {}",
         ch.advance_width
     );
 }

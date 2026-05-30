@@ -396,6 +396,13 @@ impl FontInfo {
                         .map(|r| r as f32)
                         .or_else(|| v.as_integer().map(|i| i as f32))
                 })
+                // A degenerate FontMatrix[0] — zero, near-zero, or non-finite —
+                // is a malformed horizontal scale (ISO 32000-1 §9.2.4 / §9.6.5)
+                // and would make the `default_width * 0.001 / font_matrix_a`
+                // rescale below divide by ~0 → inf/NaN, and the
+                // `font_size * font_matrix_a` advance collapse to 0. Reject it
+                // and fall back to the standard 0.001 (Type 1) scale.
+                .filter(|a| a.is_finite() && a.abs() > 1e-6)
                 .unwrap_or(0.001)
         } else {
             0.001

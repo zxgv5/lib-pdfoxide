@@ -785,7 +785,6 @@ impl PyPdfDocument {
     ///         regression on PDFs whose running-artifact heuristic
     ///         over-triggers on real content. Pass `False` to get the
     ///         spec-correct behavior (artifact-tagged spans excluded).
-    ///
     ///     region, word_gap_threshold, profile (deprecated, optional):
     ///         Power-user overrides retained for backward compatibility.
     ///         Passing any of these emits a DeprecationWarning. They will
@@ -848,7 +847,6 @@ impl PyPdfDocument {
     ///         Default **True** for backward compatibility with 0.3.41.
     ///         Pass `False` to get the spec-correct behavior
     ///         (artifact-tagged spans excluded).
-    ///
     ///     region, word_gap_threshold, line_gap_threshold, profile
     ///         (deprecated, optional): Power-user overrides retained for
     ///         backward compatibility. Passing any of these emits a
@@ -2713,12 +2711,14 @@ impl PyPdfDocument {
     /// Extract a subset of pages and return them as PDF bytes.
     /// `pages` is a list of 0-based indices to keep. The source document is not modified.
     ///
-    /// Example::
+    /// # Example
     ///
-    ///     from itertools import batched
-    ///     doc = PdfDocument.from_bytes(pdf_bytes)
-    ///     for chunk in batched(range(doc.page_count()), 50):
-    ///         chunk_bytes = doc.extract_pages_to_bytes(list(chunk))
+    /// ```python
+    /// from itertools import batched
+    /// doc = PdfDocument.from_bytes(pdf_bytes)
+    /// for chunk in batched(range(doc.page_count()), 50):
+    ///     chunk_bytes = doc.extract_pages_to_bytes(list(chunk))
+    /// ```
     fn extract_pages_to_bytes<'py>(
         &mut self,
         py: Python<'py>,
@@ -2738,12 +2738,14 @@ impl PyPdfDocument {
     /// `(start, end)` interpreted as `[start, end)`. Returns a list of `bytes`
     /// objects, one per range, in the same order.
     ///
-    /// Example::
+    /// # Example
     ///
-    ///     doc = PdfDocument.from_bytes(pdf_bytes)
-    ///     n = doc.page_count()
-    ///     ranges = [(i, min(i + 3000, n)) for i in range(0, n, 3000)]
-    ///     chunks = doc.extract_page_ranges_to_bytes(ranges)
+    /// ```python
+    /// doc = PdfDocument.from_bytes(pdf_bytes)
+    /// n = doc.page_count()
+    /// ranges = [(i, min(i + 3000, n)) for i in range(0, n, 3000)]
+    /// chunks = doc.extract_page_ranges_to_bytes(ranges)
+    /// ```
     fn extract_page_ranges_to_bytes<'py>(
         &mut self,
         py: Python<'py>,

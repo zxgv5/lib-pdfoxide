@@ -27,7 +27,11 @@
 //! - **Raster image XObjects** (`Do` with `Subtype /Image`), including
 //!   DeviceN / Separation-encoded TIFFs and CMYK photographs. The
 //!   sample data is dropped. Vector artwork inside Form XObjects is
-//!   recursed into and rendered normally.
+//!   recursed into and rendered normally; spot / DeviceN ink
+//!   *declarations* in nested Form XObject `/Resources` are also
+//!   surfaced as plates via
+//!   [`crate::document::PdfDocument::get_page_inks_deep`] even when the
+//!   form's local content stream doesn't paint them.
 //! - **Shading patterns** (`sh` operator) — gradients used as fills.
 //! - **Tiling and shading patterns** invoked via `scn` / `SCN` with a
 //!   `/Pattern` colour space.
@@ -284,12 +288,13 @@ fn render_plates_for_inks(
 
 /// Collect all ink names present on a page.
 ///
-/// CMYK is always returned regardless of whether the page actually
-/// uses CMYK content — emitting four extra all-zero plates is much
-/// cheaper than the recursive operator walk that would be required to
-/// detect CMYK content nested inside Form XObjects (the previous
-/// shallow scan missed those, RED #1). Unused CMYK plates are filtered
-/// out by the short-circuit in [`render_separations`].
+/// CMYK is always returned regardless of whether the page actually uses
+/// CMYK content; unused process plates are filtered out by the per-plate
+/// short-circuit in [`render_separations`].
+///
+/// Spot inks come from [`PdfDocument::get_page_inks_deep`], which walks
+/// the page's content stream into nested Form XObjects (§8.10) so spots
+/// declared in form-local resources are discovered.
 fn collect_page_inks(doc: &PdfDocument, page_num: usize) -> Result<Vec<String>> {
     let mut inks = vec![
         "Cyan".to_string(),
@@ -298,7 +303,7 @@ fn collect_page_inks(doc: &PdfDocument, page_num: usize) -> Result<Vec<String>> 
         "Black".to_string(),
     ];
 
-    let spot_inks = doc.get_page_inks(page_num)?;
+    let spot_inks = doc.get_page_inks_deep(page_num)?;
     for ink in spot_inks {
         if !inks.contains(&ink) {
             inks.push(ink);

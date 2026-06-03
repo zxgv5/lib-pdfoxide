@@ -2023,7 +2023,7 @@ mod tests {
         assert_eq!(map.get(&0x4e), Some(&7), "0x4e (N) → GID 7");
 
         // Bytes whose glyph name is not in the Charset stay out.
-        assert!(map.get(&0x7e).is_none(), "0x7e (asciitilde) not in charset");
+        assert!(!map.contains_key(&0x7e), "0x7e (asciitilde) not in charset");
     }
 
     /// /Differences entries override the base predefined encoding.

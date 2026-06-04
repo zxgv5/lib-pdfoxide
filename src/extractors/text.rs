@@ -1705,6 +1705,11 @@ struct TjBuffer {
     /// Display rotation of this run in degrees, snapped to a quadrant when near
     /// one; `0.0` for ordinary horizontal text (see `snap_run_rotation`).
     rotation_degrees: f32,
+    /// Writing mode (0 = horizontal, 1 = vertical) captured from the
+    /// graphics state when the buffer started, so each emitted span
+    /// carries the wmode it was rendered under. A font change flushes the
+    /// buffer, so a single buffer never spans mixed writing modes.
+    wmode: u8,
 }
 
 /// Snap a run's display rotation (from the composed `CTM × T_m` rotation block,
@@ -1794,6 +1799,7 @@ impl TjBuffer {
             user_pos_y: user_pos.y,
             user_h_scale,
             rotation_degrees,
+            wmode: state.text_wmode,
         }
     }
 
@@ -3643,6 +3649,27 @@ impl<'doc> TextExtractor<'doc> {
             return;
         }
 
+        // Vertical-mode (tategaki) routing. Each span carries the writing
+        // mode it was emitted under (`wmode == 1` for vertical text). When
+        // the page is *predominantly* vertical we apply column-aware
+        // top-to-bottom + right-to-left ordering. When the page is
+        // predominantly horizontal we fall through to the existing
+        // horizontal sort; the rare mixed-mode case stays governed by the
+        // dominant mode here. Per-span wmode is preserved on every span
+        // either way, so downstream consumers (export, search) can still
+        // distinguish them.
+        let vertical_count = self.spans.iter().filter(|s| s.wmode == 1).count();
+        let total = self.spans.len();
+        if total > 0 && vertical_count * 2 >= total {
+            log::trace!(
+                "Reading order: {}/{} spans are vertical — using tategaki sort",
+                vertical_count,
+                total
+            );
+            self.sort_spans_vertical_tategaki();
+            return;
+        }
+
         // Detect columns first
         let columns = self.detect_span_columns();
 
@@ -3670,6 +3697,48 @@ impl<'doc> TextExtractor<'doc> {
             log::trace!("Using column-aware sorting ({} columns)", columns.len());
             self.sort_spans_by_columns(&columns);
         }
+    }
+
+    /// Sort spans in vertical writing (tategaki) order: right-to-left
+    /// across columns, top-to-bottom within each column. Spans whose
+    /// horizontal X-centers cluster together belong to the same column.
+    ///
+    /// The cluster tolerance is the median span width — wide enough to keep
+    /// glyphs of one body column together, narrow enough to separate
+    /// adjacent columns. PDF user-space y increases upward, so within a
+    /// column we sort by descending y (top first).
+    fn sort_spans_vertical_tategaki(&mut self) {
+        if self.spans.is_empty() {
+            return;
+        }
+
+        // Estimate a per-column-grouping tolerance from the median span
+        // width (cheap, robust to outliers from rotated annotations).
+        let mut widths: Vec<f32> = self.spans.iter().map(|s| s.bbox.width.max(1.0)).collect();
+        widths.sort_by(|a, b| crate::utils::safe_float_cmp(*a, *b));
+        let median_w = widths[widths.len() / 2].max(1.0);
+        let tol = median_w; // ±median width groups glyphs of the same vertical run
+
+        // Compute each span's X center, then cluster centers by proximity.
+        let mut sorted_idx: Vec<usize> = (0..self.spans.len()).collect();
+        let x_center = |i: usize| -> f32 { self.spans[i].bbox.x + self.spans[i].bbox.width * 0.5 };
+        // Right-to-left primary: descending x_center, then descending y.
+        sorted_idx.sort_by(|&a, &b| {
+            let ax = x_center(a);
+            let bx = x_center(b);
+            if (ax - bx).abs() <= tol {
+                // Same column: top first (PDF user space — descending y).
+                crate::utils::safe_float_cmp(self.spans[b].bbox.y, self.spans[a].bbox.y)
+            } else {
+                crate::utils::safe_float_cmp(bx, ax) // descending x_center
+            }
+        });
+
+        let new_spans: Vec<TextSpan> = sorted_idx
+            .into_iter()
+            .map(|i| self.spans[i].clone())
+            .collect();
+        self.spans = new_spans;
     }
 
     /// Simple Y-then-X sorting for single-column layouts.
@@ -6437,6 +6506,7 @@ impl<'doc> TextExtractor<'doc> {
             },
             heading_level: None,
             rotation_degrees: buffer.rotation_degrees,
+            wmode: buffer.wmode,
         };
         self.span_sequence_counter += 1;
 
@@ -6955,6 +7025,7 @@ impl<'doc> TextExtractor<'doc> {
             char_widths: vec![],
             heading_level: None,
             rotation_degrees: snap_run_rotation(&state.ctm.multiply(&state.text_matrix)),
+            wmode: state.text_wmode,
         };
 
         // Step 6: Increment sequence counter and add to spans
@@ -7626,6 +7697,7 @@ impl<'doc> TextExtractor<'doc> {
             char_widths: vec![],
             heading_level: None,
             rotation_degrees: snap_run_rotation(&state.ctm.multiply(&state.text_matrix)),
+            wmode: state.text_wmode,
         };
         self.span_sequence_counter += 1;
 
@@ -7786,6 +7858,7 @@ impl<'doc> TextExtractor<'doc> {
                     },
                     heading_level: None,
                     rotation_degrees: buffer.rotation_degrees,
+                    wmode: buffer.wmode,
                 };
                 self.span_sequence_counter += 1;
 
@@ -8563,6 +8636,7 @@ mod tests {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             },
             TextSpan {
                 artifact_type: None,
@@ -8591,6 +8665,7 @@ mod tests {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             },
         ];
 
@@ -9470,6 +9545,7 @@ mod tests {
             char_widths: vec![],
             heading_level: None,
             rotation_degrees: 0.0,
+            wmode: 0,
         }
     }
 
@@ -10352,6 +10428,7 @@ mod tests {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             },
             TextSpan {
                 artifact_type: None,
@@ -10375,6 +10452,7 @@ mod tests {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             },
         ];
 
@@ -10423,6 +10501,7 @@ mod tests {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             };
 
         // (glyph, Helvetica per-em advance width)
@@ -10479,6 +10558,7 @@ mod tests {
             char_widths: vec![],
             heading_level: None,
             rotation_degrees: 0.0,
+            wmode: 0,
         };
 
         // Stroke pass + fill pass at ~2 % of advance apart.
@@ -10531,6 +10611,7 @@ mod tests {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             });
         }
 
@@ -10725,6 +10806,7 @@ mod tests {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             },
             TextSpan {
                 artifact_type: None,
@@ -10748,6 +10830,7 @@ mod tests {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             },
         ];
 
@@ -10785,6 +10868,7 @@ mod tests {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             },
             TextSpan {
                 artifact_type: None,
@@ -10808,6 +10892,7 @@ mod tests {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             },
         ];
 
@@ -10850,6 +10935,7 @@ mod tests {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             },
             TextSpan {
                 artifact_type: None,
@@ -10873,6 +10959,7 @@ mod tests {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             },
         ];
 
@@ -10908,6 +10995,7 @@ mod tests {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             },
             TextSpan {
                 artifact_type: None,
@@ -10931,6 +11019,7 @@ mod tests {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             },
             TextSpan {
                 artifact_type: None,
@@ -10954,6 +11043,7 @@ mod tests {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             },
         ];
 
@@ -13320,6 +13410,7 @@ mod tests {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             },
             TextSpan {
                 artifact_type: None,
@@ -13343,6 +13434,7 @@ mod tests {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             },
         ];
 
@@ -13376,6 +13468,7 @@ mod tests {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             },
             TextSpan {
                 artifact_type: None,
@@ -13399,6 +13492,7 @@ mod tests {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             },
         ];
 
@@ -13492,6 +13586,7 @@ mod tests {
             char_widths: vec![],
             heading_level: None,
             rotation_degrees: 0.0,
+            wmode: 0,
         }];
 
         extractor.split_fused_words();
@@ -13526,6 +13621,7 @@ mod tests {
             char_widths: vec![],
             heading_level: None,
             rotation_degrees: 0.0,
+            wmode: 0,
         }];
 
         extractor.split_fused_words();
@@ -13707,6 +13803,7 @@ mod tests {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             },
             TextSpan {
                 artifact_type: None,
@@ -13730,6 +13827,7 @@ mod tests {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             },
         ];
 
@@ -13809,6 +13907,7 @@ mod tests {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             },
             TextSpan {
                 artifact_type: None,
@@ -13832,6 +13931,7 @@ mod tests {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             },
         ];
 
@@ -14130,6 +14230,7 @@ mod tests {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             },
             TextSpan {
                 artifact_type: None,
@@ -14153,6 +14254,7 @@ mod tests {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             },
         ];
 
@@ -14329,6 +14431,7 @@ mod tests {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             },
             TextSpan {
                 artifact_type: None,
@@ -14352,6 +14455,7 @@ mod tests {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             },
         ];
 
@@ -14885,6 +14989,7 @@ mod profile_based_space_tests {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             },
             TextSpan {
                 artifact_type: None,
@@ -14908,6 +15013,7 @@ mod profile_based_space_tests {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             },
         ];
 
@@ -14950,6 +15056,7 @@ mod profile_based_space_tests {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             },
             TextSpan {
                 artifact_type: None,
@@ -14973,6 +15080,7 @@ mod profile_based_space_tests {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             },
         ];
 
@@ -15015,6 +15123,7 @@ mod profile_based_space_tests {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             },
             TextSpan {
                 artifact_type: None,
@@ -15038,6 +15147,7 @@ mod profile_based_space_tests {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             },
         ];
 
@@ -15086,6 +15196,7 @@ mod profile_based_space_tests {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             },
             TextSpan {
                 artifact_type: None,
@@ -15109,6 +15220,7 @@ mod profile_based_space_tests {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             },
         ];
 
@@ -15149,6 +15261,7 @@ mod profile_based_space_tests {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             },
             TextSpan {
                 artifact_type: None,
@@ -15172,6 +15285,7 @@ mod profile_based_space_tests {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             },
         ];
 
@@ -15209,6 +15323,7 @@ mod profile_based_space_tests {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             },
             TextSpan {
                 artifact_type: None,
@@ -15232,6 +15347,7 @@ mod profile_based_space_tests {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             },
         ];
 
@@ -15273,6 +15389,7 @@ mod profile_based_space_tests {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             },
             TextSpan {
                 artifact_type: None,
@@ -15296,6 +15413,7 @@ mod profile_based_space_tests {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             },
         ];
 

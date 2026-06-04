@@ -7438,6 +7438,7 @@ impl PdfDocument {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             });
         }
 
@@ -7604,6 +7605,7 @@ impl PdfDocument {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             });
         }
 
@@ -9513,14 +9515,33 @@ impl PdfDocument {
             }
         }
 
-        // Reading order: XY-cut when the page has multiple columns (B4);
-        // otherwise the cheap row-aware sort. XY-cut is spatial recursion
-        // that correctly orders multi-column layouts (newspapers, academic
-        // papers, dashboards) but is overkill for single-column pages
-        // doesn't handle tabular rowspan labels specifically. Heuristic:
-        // count distinct X-center clusters with vertical overlap; ≥2
-        // clusters → multi-column.
-        if Self::is_multi_column_page(&spans) {
+        // Tategaki (vertical writing) intercept. Pages whose majority of
+        // spans were emitted under WMode 1 (font /Encoding ends in -V or
+        // the CMap declares /WMode 1) need right-to-left, top-to-bottom
+        // ordering. Row-aware / XY-cut sorts assume horizontal flow and
+        // scramble vertical text; per-span wmode lets us route just those
+        // pages through a tategaki comparator while leaving every existing
+        // horizontal corpus untouched.
+        let vertical_count = spans.iter().filter(|s| s.wmode == 1).count();
+        if !spans.is_empty() && vertical_count * 2 >= spans.len() {
+            // Cluster tolerance: median span width. Wide enough to keep one
+            // vertical column together, narrow enough to separate adjacent
+            // columns. Robust to single rotated outliers.
+            let mut widths: Vec<f32> = spans.iter().map(|s| s.bbox.width.max(1.0)).collect();
+            widths.sort_by(|a, b| crate::utils::safe_float_cmp(*a, *b));
+            let tol = widths[widths.len() / 2].max(1.0);
+            spans.sort_by(|a, b| {
+                let ax = a.bbox.x + a.bbox.width * 0.5;
+                let bx = b.bbox.x + b.bbox.width * 0.5;
+                if (ax - bx).abs() <= tol {
+                    // Same column: top first (descending y in PDF user space).
+                    crate::utils::safe_float_cmp(b.bbox.y, a.bbox.y)
+                } else {
+                    // Different column: rightmost first.
+                    crate::utils::safe_float_cmp(bx, ax)
+                }
+            });
+        } else if Self::is_multi_column_page(&spans) {
             use crate::pipeline::reading_order::{
                 ReadingOrderContext as ROContext, ReadingOrderStrategy, XYCutStrategy,
             };
@@ -12919,6 +12940,7 @@ impl PdfDocument {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             })
             .collect();
 
@@ -14362,6 +14384,7 @@ impl PdfDocument {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             })
             .collect();
 
@@ -18692,6 +18715,7 @@ mod tests {
             char_widths: vec![],
             heading_level: None,
             rotation_degrees: 0.0,
+            wmode: 0,
         }
     }
 
@@ -18902,6 +18926,7 @@ mod tests {
             char_widths,
             heading_level: None,
             rotation_degrees: 0.0,
+            wmode: 0,
         }
     }
 
@@ -22126,6 +22151,7 @@ mod tests {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             }
         }
 
@@ -22190,6 +22216,7 @@ mod tests {
             char_widths: vec![],
             heading_level: None,
             rotation_degrees: 0.0,
+            wmode: 0,
         }
     }
 
@@ -22563,6 +22590,7 @@ mod tests {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             }
         }
 
@@ -22633,6 +22661,7 @@ mod tests {
                 char_widths: vec![],
                 heading_level: None,
                 rotation_degrees: 0.0,
+                wmode: 0,
             }
         }
 

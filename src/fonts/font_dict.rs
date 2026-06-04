@@ -2081,36 +2081,65 @@ impl FontInfo {
             match &w2_array[i] {
                 Object::Array(triples) => {
                     // Form A: c [ w1y v_x v_y w1y v_x v_y … ]
-                    // Walk the inner array in groups of three.
+                    // Walk the inner array in groups of three. A triple is
+                    // atomic: if any of its three elements is non-numeric
+                    // we drop the WHOLE triple (advance j+=3, emitted+=1)
+                    // so the CID alignment of the rest of the inner array
+                    // is preserved. The original implementation advanced
+                    // j by 1 on a malformed element, which silently
+                    // shifted every subsequent CID by one slot.
                     let mut j = 0;
                     let mut emitted: u32 = 0;
+                    let read_num = |obj: &Object| -> Option<f32> {
+                        match obj {
+                            Object::Integer(v) => Some(*v as f32),
+                            Object::Real(v) => Some(*v as f32),
+                            _ => None,
+                        }
+                    };
                     while j + 2 < triples.len() {
-                        let w1y = match &triples[j] {
-                            Object::Integer(v) => *v as f32,
-                            Object::Real(v) => *v as f32,
-                            _ => {
-                                j += 1;
-                                continue;
-                            },
+                        let triple = (
+                            read_num(&triples[j]),
+                            read_num(&triples[j + 1]),
+                            read_num(&triples[j + 2]),
+                        );
+                        // Compute CID with overflow detection BEFORE writing.
+                        // saturating_add(emitted) would collapse every
+                        // overflowing slot onto u16::MAX; instead we stop.
+                        let Some(cid) = (cid_start as u32).checked_add(emitted) else {
+                            log::warn!(
+                                "Font '{}': /W2 Form A starting at CID {} overflowed u32 \
+                                 at emitted offset {}; stopping",
+                                base_font,
+                                cid_start,
+                                emitted
+                            );
+                            break;
                         };
-                        let v_x = match &triples[j + 1] {
-                            Object::Integer(v) => *v as f32,
-                            Object::Real(v) => *v as f32,
-                            _ => {
-                                j += 1;
-                                continue;
+                        if cid > u16::MAX as u32 {
+                            log::warn!(
+                                "Font '{}': /W2 Form A starting at CID {} would assign \
+                                 beyond u16::MAX at emitted offset {}; stopping",
+                                base_font,
+                                cid_start,
+                                emitted
+                            );
+                            break;
+                        }
+                        match triple {
+                            (Some(w1y), Some(v_x), Some(v_y)) => {
+                                metrics.insert(cid as u16, VerticalMetrics { w1y, v_x, v_y });
                             },
-                        };
-                        let v_y = match &triples[j + 2] {
-                            Object::Integer(v) => *v as f32,
-                            Object::Real(v) => *v as f32,
                             _ => {
-                                j += 1;
-                                continue;
+                                log::warn!(
+                                    "Font '{}': /W2 Form A triple starting at CID {} (offset \
+                                     {}) is malformed; dropping it (keeping CID alignment)",
+                                    base_font,
+                                    cid_start,
+                                    emitted
+                                );
                             },
-                        };
-                        let cid = cid_start.saturating_add(emitted as u16);
-                        metrics.insert(cid, VerticalMetrics { w1y, v_x, v_y });
+                        }
                         emitted += 1;
                         j += 3;
                     }
@@ -8016,6 +8045,139 @@ mod tests {
         assert_eq!(
             metrics.get(&1),
             Some(&VerticalMetrics { w1y: -987.5, v_x: 501.25, v_y: 879.75 })
+        );
+    }
+
+    /// `/W2` Form A with a malformed inner triple must not desynchronise
+    /// the CID assignment of subsequent triples. The original
+    /// implementation advanced `j` by 1 on a non-numeric element without
+    /// touching `emitted`, so every following triple was shifted up by
+    /// one CID. Spec stance: a triple is atomic — drop the whole triple
+    /// (advance `j` by 3 and `emitted` by 1) so the CID alignment of the
+    /// rest of the inner array is preserved.
+    #[test]
+    fn test_parse_w2_form_a_skips_malformed_triple_without_desync() {
+        let mut dict: HashMap<String, Object> = HashMap::new();
+        // CID 10 is intentionally malformed (a name where w1y should be).
+        // CID 11 must remain aligned to its proper triple, not slide into
+        // CID 10's slot.
+        dict.insert(
+            "W2".to_string(),
+            Object::Array(vec![
+                Object::Integer(10),
+                Object::Array(vec![
+                    // CID 10: malformed (name instead of number).
+                    Object::Name("Bogus".to_string()),
+                    Object::Integer(500),
+                    Object::Integer(880),
+                    // CID 11: well-formed (-1000, 500, 880).
+                    Object::Integer(-1000),
+                    Object::Integer(500),
+                    Object::Integer(880),
+                ]),
+            ]),
+        );
+        let metrics = FontInfo::parse_cid_vertical_metrics(&dict, "Test").unwrap();
+        // CID 10 was malformed: must NOT carry the metrics that belong to CID 11.
+        assert!(
+            metrics.get(&10).is_none(),
+            "malformed CID 10 must not appear in metrics; got {:?}",
+            metrics.get(&10)
+        );
+        // CID 11 must carry its own metrics — not collapsed onto CID 10 or
+        // shifted into a different CID slot.
+        assert_eq!(
+            metrics.get(&11),
+            Some(&VerticalMetrics { w1y: -1000.0, v_x: 500.0, v_y: 880.0 })
+        );
+    }
+
+    /// `/W2` Form B near the top of the u16 range must not silently
+    /// collapse every overflowing CID onto u16::MAX via saturating
+    /// arithmetic. The loop must break (with a warning log) when the
+    /// requested range would wrap past 0xFFFF.
+    #[test]
+    fn test_parse_w2_form_b_overflow_does_not_collapse() {
+        // c_first = 0xFFFB, c_last = 0xFFFF — fits exactly within u16 so
+        // every CID in 65531..=65535 must be inserted distinctly. A
+        // saturating-add bug would collapse them all onto u16::MAX (and
+        // an unchecked-add bug would wrap around to 0).
+        let mut dict: HashMap<String, Object> = HashMap::new();
+        dict.insert(
+            "W2".to_string(),
+            Object::Array(vec![
+                Object::Integer(0xFFFB),
+                Object::Integer(0xFFFF),
+                Object::Integer(-1000),
+                Object::Integer(500),
+                Object::Integer(880),
+            ]),
+        );
+        let metrics = FontInfo::parse_cid_vertical_metrics(&dict, "Test").unwrap();
+        let expected = VerticalMetrics { w1y: -1000.0, v_x: 500.0, v_y: 880.0 };
+        for cid in 0xFFFBu16..=0xFFFFu16 {
+            assert_eq!(
+                metrics.get(&cid),
+                Some(&expected),
+                "CID 0x{:04X} must carry the range metrics",
+                cid
+            );
+        }
+        // Exactly five distinct CIDs were inserted; nothing else.
+        assert_eq!(
+            metrics.len(),
+            5,
+            "Form B near u16::MAX should insert 5 distinct entries; got {}",
+            metrics.len()
+        );
+    }
+
+    /// `/W2` Form A with a CID start near u16::MAX and an inner array
+    /// long enough to overflow MUST stop emitting on overflow rather than
+    /// silently collapsing every subsequent CID onto u16::MAX via
+    /// saturating arithmetic.
+    #[test]
+    fn test_parse_w2_form_a_stops_on_overflow() {
+        let mut dict: HashMap<String, Object> = HashMap::new();
+        // cid_start = 0xFFFE — only two slots remain (0xFFFE, 0xFFFF) so
+        // the third triple would wrap. Confirm we emit exactly two
+        // distinct CIDs, not three (which would imply two metrics
+        // collapsed onto u16::MAX) and not zero (which would imply a
+        // panic-on-overflow bug).
+        dict.insert(
+            "W2".to_string(),
+            Object::Array(vec![
+                Object::Integer(0xFFFE),
+                Object::Array(vec![
+                    // CID 0xFFFE
+                    Object::Integer(-1000),
+                    Object::Integer(500),
+                    Object::Integer(880),
+                    // CID 0xFFFF
+                    Object::Integer(-900),
+                    Object::Integer(510),
+                    Object::Integer(870),
+                    // CID 0x10000 — overflows; must be DROPPED.
+                    Object::Integer(-800),
+                    Object::Integer(520),
+                    Object::Integer(860),
+                ]),
+            ]),
+        );
+        let metrics = FontInfo::parse_cid_vertical_metrics(&dict, "Test").unwrap();
+        assert_eq!(
+            metrics.get(&0xFFFE),
+            Some(&VerticalMetrics { w1y: -1000.0, v_x: 500.0, v_y: 880.0 })
+        );
+        assert_eq!(
+            metrics.get(&0xFFFF),
+            Some(&VerticalMetrics { w1y: -900.0, v_x: 510.0, v_y: 870.0 })
+        );
+        assert_eq!(
+            metrics.len(),
+            2,
+            "Form A overflow must drop overflowing triples; got {} entries",
+            metrics.len()
         );
     }
 

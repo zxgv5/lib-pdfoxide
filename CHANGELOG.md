@@ -2,6 +2,17 @@
 
 All notable changes to PDFOxide are documented here.
 
+## [Unreleased]
+
+### Added
+
+- **Vertical writing mode (WMode 1 / tategaki) support across extraction, rendering, and reading-order pipelines** — Japanese tategaki, Traditional Chinese vertical packaging, and similar `-V`-suffixed encodings (Identity-V, UniJIS-UTF16-V, UniGB-UTF16-V, UniCNS-UTF16-V, UniKS-UTF16-V) plus CMap streams with `/WMode 1 def` now drive vertical glyph advance along the y-axis instead of being silently rendered as horizontal. The §9.4.4 axis-swap math lives in a single helper (`GraphicsState::advance_text_matrix`) consumed by the extractor, page renderer, separation renderer, and text rasterizer — horizontal text pays one predicted-not-taken branch per advance. Per-CID `/W2` (§9.7.4.3) and `/DW2` arrays are parsed for vertical metrics; ToUnicode `/WMode` is intentionally ignored per §9.10.2 so a stale tooling leftover can't flip the document. Vertical-majority pages (≥50% of spans tagged `wmode == 1`) bypass the configured `ReadingOrderStrategyType` and route through a dedicated right-to-left column-ordering path, since none of the horizontal strategies can produce correct vertical reading order.
+
+### Changed
+
+- **`FontInfo` gains three new `pub` fields (`wmode: u8`, `cid_vertical_metrics: Option<HashMap<u16, VerticalMetrics>>`, `cid_default_vertical_metrics: VerticalMetrics`)** — source-breaking for downstream code that constructs `FontInfo` with struct-literal syntax; add the three new fields to fix. Horizontal-only fonts pay no allocation cost (`cid_vertical_metrics: None`, `cid_default_vertical_metrics` is `Copy`). `FontInfo` continues to NOT be `#[non_exhaustive]`, consistent with the 0.3.60 `ascent`/`descent` addition. The natural construction values for the new fields are `wmode: 0`, `cid_vertical_metrics: None`, `cid_default_vertical_metrics: VerticalMetrics::SPEC_DEFAULT`.
+- **`ReadingOrderConfig::strategy` is now overridden on vertical-majority pages** — the configured horizontal strategy (Simple, Geometric, XYCut, StructureTreeFirst) is bypassed when a page has ≥50% vertical-writing spans, and the page is ordered through the tategaki path instead. Per-span `wmode` is preserved on every output span so consumers can still distinguish the two modes. See `ReadingOrderConfig::strategy` rustdoc for the rule.
+
 ## [0.3.60] - 2026-06-03
 
 > Converter performance sweep (no double per-page extraction, cached structure-tree traversal) + Arabic/Persian CIDFont extraction, ZapfDingbats coverage, graceful encrypted-PDF text extraction, and an `extract_tables` opt-out for speed-first text extraction

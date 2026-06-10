@@ -4765,7 +4765,9 @@ fn shift_jis_to_unicode(code: u16) -> Option<char> {
 fn normalize_cjk_radical_forms(s: &str) -> String {
     use unicode_normalization::UnicodeNormalization;
     fn is_radical(c: char) -> bool {
-        matches!(c as u32, 0x2E80..=0x2EFF | 0x2F00..=0x2FDF)
+        // CJK Radicals Supplement (U+2E80–2EFF) + Kangxi Radicals (U+2F00–2FDF),
+        // which are contiguous, so a single range covers both blocks.
+        matches!(c as u32, 0x2E80..=0x2FDF)
     }
     if !s.chars().any(is_radical) {
         return s.to_string();

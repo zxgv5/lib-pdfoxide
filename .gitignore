@@ -1,5 +1,6 @@
 # Rust
 /target/
+/target-wheel/
 **/*.rs.bk
 *.pdb
 
@@ -23,6 +24,12 @@ eggs/
 lib/
 !go/lib/
 !ruby/lib/
+!dart/lib/
+!dart/lib/**
+!zig/lib/
+!zig/lib/**
+!elixir/lib/
+!elixir/lib/**
 lib64/
 parts/
 sdist/
@@ -340,6 +347,8 @@ tests/golden_files/
 .agents/
 .cursor/
 .antigravitycli/
+# Playwright MCP local state/cache
+.playwright-mcp/
 
 
 # pdm-python
@@ -393,3 +402,56 @@ ruby/Gemfile.lock
 ruby/coverage/
 ruby/*.gem
 ruby/.bundle/
+
+# C++ binding build dir
+/cpp/build/
+
+# Dart binding artifacts
+/dart/.dart_tool/
+/dart/pubspec.lock
+/dart/.packages
+
+# R binding build artifacts
+r/src/*.o
+r/src/*.so
+r/src/*.dll
+# R CMD check output dir — named <pkg>.Rcheck, emitted wherever check is run.
+*.Rcheck/
+r/*.tar.gz
+
+# Kotlin binding artifacts
+/kotlin/.gradle/
+/kotlin/build/
+/kotlin/.kotlin/
+
+# Julia binding artifacts
+/julia/Manifest.toml
+
+# Zig binding artifacts
+/zig/.zig-cache/
+/zig/zig-out/
+
+# Scala binding artifacts
+/scala/target/
+/scala/project/target/
+/scala/project/project/
+
+# Clojure binding artifacts
+/clojure/.cpcache/
+/clojure/.clj-kondo/
+/clojure/target/
+
+# Objective-C binding build artifacts
+/objc/test_api_coverage
+/objc/basic_extraction
+/objc/*.o
+
+# Swift binding artifacts
+/swift/.build/
+/swift/Package.resolved
+
+# Elixir binding artifacts
+/elixir/_build/
+/elixir/deps/
+/elixir/priv/
+/elixir/mix.lock

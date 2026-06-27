@@ -2,11 +2,31 @@
 
 All notable changes to PDFOxide are documented here.
 
-## [Unreleased]
+## [0.3.69] - 2026-06-27
+
+> Language-bindings release — idiomatic bindings for **C++, Swift, Kotlin, Dart, R, Julia, Zig, Scala, Clojure, Objective-C, and Elixir**, each over the stable C ABI, with per-language CI, package-registry publishing, cross-language regression examples, and single-source version management.
+
+### Added
+
+- **Eleven new language bindings**, each with an idiomatic wrapper, an api-coverage test (one assertion per public method), runnable CI-asserted examples, a README with install coordinates, and a dedicated CI workflow (Linux+macOS) running the same verification set:
+  - **C++** (`cpp/`) — header-only C++17 RAII wrapper; CMake with `install`/`export` targets and a Conan recipe.
+  - **Swift** (`swift/`) — SwiftPM package + C module map.
+  - **Kotlin** (`kotlin/`) — thin facade over the Java JNI binding.
+  - **Dart/Flutter** (`dart/`) — `dart:ffi`.
+  - **R** (`r/`) — `.Call` C shim, external-pointer handles.
+  - **Julia** (`julia/`) — `ccall`.
+  - **Zig** (`zig/`) — `@cImport`.
+  - **Scala** (`scala/`) — thin facade over the Java JNI binding (Scala 3).
+  - **Clojure** (`clojure/`) — direct Java interop over the JNI binding.
+  - **Objective-C** (`objc/`) — NSObject wrappers over the C ABI.
+  - **Elixir** (`elixir/`) — dirty-scheduler NIF (CPU-bound work never blocks the BEAM).
+- **Package-registry publishing** wired into the release pipeline for the new bindings: Maven Central (Kotlin, Scala), Clojars (Clojure), Hex.pm (Elixir), and pub.dev (Dart, via GitHub OIDC). Objective-C ships as a Trunk-free CocoaPods binary pod — an `xcframework` + podspec uploaded as release assets and installed via a `:podspec` URL — since CocoaPods Trunk goes read-only on 2026-12-02. C++ (vcpkg/Conan), R (CRAN), Julia (General registry), and Swift/Zig (git tag) are documented in `docs/RELEASING-bindings.md`.
+- **Cross-language regression examples** — alongside each binding's basic example, three shared-scenario examples (HTML extraction, word geometry, table extraction) run with output assertions in every binding's CI workflow.
+- **Single-source version management** — `scripts/sync_version.py` propagates the canonical `Cargo.toml` version into every binding manifest and version/parity assert (`--check` verifies, `--set X.Y.Z` bumps everything). A `Version Consistency` CI workflow fails if any binding drifts.
 
 ### Fixed
 
-- **Non-Identity-ordered Type0 fonts no longer emit a wrong character for CIDs missing from `/ToUnicode` (#773)** — for an embedded Type0 font whose `/ToUnicode` CMap omits some drawn CIDs (e.g. a ligature glyph with no single Unicode codepoint), the decode path fell back to a numeric guess — the GID via the standard glyph-name table → AGL, or the CID itself as a code point (`char::from_u32`) — emitting a plausible-but-wrong, content-like character that varied per subset (e.g. a `ti` ligature → `:` / `D`, so `notificacao` → `no:ficacao`). The glyph has no Unicode anywhere in the file (no `/ToUnicode` entry, no `post` name, no GSUB), so the letters are unrecoverable, but substituting a wrong character is silent corruption. When a usable `/ToUnicode` is present, the GID→AGL guess is now suppressed for all Type0 fonts, and the CID-as-Unicode guess is suppressed for fonts whose `CIDSystemInfo` ordering is **not** `Identity`, so an uncovered CID there decodes to `U+FFFD` instead. For Identity-ordered (Adobe-Identity-0) fonts the CID-as-Unicode guess is restricted to whitespace (`U+0020` → space, which producers routinely omit and is reliably CID == codepoint); any other uncovered CID likewise decodes to `U+FFFD`. A font with no `/ToUnicode` still uses the CID-as-Unicode heuristic exactly as before, and the authoritative embedded-`cmap`/`post` lookups are unchanged.
+- **Non-Identity-ordered Type0 fonts no longer emit a wrong character for CIDs missing from `/ToUnicode` (#773, #775)** — for an embedded Type0 font whose `/ToUnicode` CMap omits some drawn CIDs (e.g. a ligature glyph with no single Unicode codepoint), the decode path fell back to a numeric guess — the GID via the standard glyph-name table → AGL, or the CID itself as a code point (`char::from_u32`) — emitting a plausible-but-wrong, content-like character that varied per subset (e.g. a `ti` ligature → `:` / `D`, so `notificacao` → `no:ficacao`). The glyph has no Unicode anywhere in the file (no `/ToUnicode` entry, no `post` name, no GSUB), so the letters are unrecoverable, but substituting a wrong character is silent corruption. When a usable `/ToUnicode` is present, the GID→AGL guess is now suppressed for all Type0 fonts, and the CID-as-Unicode guess is suppressed for fonts whose `CIDSystemInfo` ordering is **not** `Identity`, so an uncovered CID there decodes to `U+FFFD` instead. For Identity-ordered (Adobe-Identity-0) fonts the CID-as-Unicode guess is restricted to whitespace (`U+0020` → space, which producers routinely omit and is reliably CID == codepoint); any other uncovered CID likewise decodes to `U+FFFD`. A font with no `/ToUnicode` still uses the CID-as-Unicode heuristic exactly as before, and the authoritative embedded-`cmap`/`post` lookups are unchanged. This also resolves the opt-in-flag request (#775) by making the detectable-gap behaviour the default rather than a configuration flag. Thanks @schelip for reporting both issues and contributing the fix.
 
 ## [0.3.68] - 2026-06-24
 
